@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { getCheckins, submitReply } from '../utils/api';
+import { getCheckins, submitReply, uploadWithProgress } from '../utils/api';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
@@ -54,6 +54,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
   const [mediaBlob, setMediaBlob] = useState(null);
   const [textNote, setTextNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
@@ -103,10 +104,11 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
       formData.append('type', responseType);
       if (textNote) formData.append('text', textNote);
       if (mediaBlob) formData.append('media', mediaBlob, 'reply.webm');
-      await submitReply(checkinId, formData);
+      const API = import.meta.env.VITE_API_URL || '';
+      await uploadWithProgress(`${API}/api/checkins/${checkinId}/reply`, formData, (pct) => setUploadProgress(pct));
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
-    finally { setSubmitting(false); }
+    finally { setSubmitting(false); setUploadProgress(null); }
   };
 
   return (
@@ -135,8 +137,13 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
               className="flex-1 py-2 bg-forest-800 text-earth-400 rounded-lg text-sm hover:bg-forest-600 transition-colors">Back</button>
             <button onClick={handleSubmit} disabled={submitting || !textNote.trim()}
               className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50">
-              {submitting ? 'Sending...' : 'Send'}
+              {submitting ? (uploadProgress !== null ? `Uploading... ${uploadProgress}%` : 'Sending...') : 'Send'}
             </button>
+            {submitting && uploadProgress !== null && (
+              <div className="w-full bg-forest-800 rounded-full h-1.5">
+                <div className="bg-gold-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -167,10 +174,15 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
                   className="flex-1 py-2 bg-forest-800 text-earth-400 rounded-lg text-sm hover:bg-forest-600 transition-colors">Re-record</button>
                 <button onClick={handleSubmit} disabled={submitting}
                   className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50">
-                  {submitting ? 'Sending...' : 'Send'}
+                  {submitting ? (uploadProgress !== null ? `Uploading... ${uploadProgress}%` : 'Sending...') : 'Send'}
                 </button>
               </div>
             )}
+          {submitting && uploadProgress !== null && (
+            <div className="w-full bg-forest-800 rounded-full h-1.5 mt-2">
+              <div className="bg-gold-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+            </div>
+          )}
           </div>
           {!mediaBlob && !recording && (
             <button onClick={() => setResponseType(null)} className="w-full text-earth-600 text-xs py-1 hover:text-earth-400 transition-colors">← Choose different type</button>
@@ -186,7 +198,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
 // ===== Thread Message Display =====
 function ThreadMessage({ msg, isCoach }) {
   const borderColor = isCoach ? 'border-l-[#C9A96E]/60' : 'border-l-green-600/60';
-  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-8 h-8 inline" /> Coach</> : <><img src="/icons/client-reply.png" alt="" className="w-10 h-10 inline" /> You</>;
+  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-8 h-8 inline" /> Coach</> : <><img src="/icons/client-reply.svg" alt="" className="w-10 h-10 inline" /> You</>;
   const labelColor = isCoach ? 'text-gold-500' : 'text-green-400';
 
   return (
