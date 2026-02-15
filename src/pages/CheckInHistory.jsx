@@ -186,7 +186,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
 // ===== Thread Message Display =====
 function ThreadMessage({ msg, isCoach }) {
   const borderColor = isCoach ? 'border-l-[#C9A96E]/60' : 'border-l-green-600/60';
-  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-8 h-8 inline" /> Coach</> : <><img src="/icons/reply2.png" alt="" className="w-7 h-7 inline" /> You</>;
+  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-8 h-8 inline" /> Coach</> : <><img src="/icons/client-reply.png" alt="" className="w-7 h-7 inline" /> You</>;
   const labelColor = isCoach ? 'text-gold-500' : 'text-green-400';
 
   return (
