@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remember-v2';
+const CACHE_NAME = 'remember-v3';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
