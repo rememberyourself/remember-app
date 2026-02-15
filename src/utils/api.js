@@ -161,3 +161,25 @@ export function avatarUrl(avatarPath) {
   if (!avatarPath) return null;
   return `${API}/uploads/${avatarPath}`;
 }
+
+// Upload with progress tracking via XMLHttpRequest
+export function uploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({}); }
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status}`));
+      }
+    });
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+    xhr.send(formData);
+  });
+}

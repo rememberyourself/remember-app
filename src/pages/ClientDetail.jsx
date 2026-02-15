@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource } from '../utils/api';
+import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress } from '../utils/api';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
@@ -70,6 +70,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   const [mediaBlob, setMediaBlob] = useState(null);
   const [textNote, setTextNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
@@ -128,6 +129,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
     if ((responseType === 'video' || responseType === 'audio') && !mediaBlob) return;
 
     setSubmitting(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append('type', responseType);
@@ -135,12 +137,13 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
       if (mediaBlob) {
         formData.append('media', mediaBlob, `response.webm`);
       }
-      await submitCoachResponse(checkinId, formData);
+      await uploadWithProgress(`/api/checkins/${checkinId}/response`, formData, setUploadProgress);
       onSubmitted();
     } catch {
       alert('Failed to submit response.');
     } finally {
       setSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -225,8 +228,13 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
                   Re-record
                 </button>
                 <button onClick={handleSubmit} disabled={submitting}
-                  className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50">
-                  {submitting ? 'Sending...' : 'Send'}
+                  className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50 relative overflow-hidden">
+                  {submitting && uploadProgress < 100 && (
+                    <div className="absolute bottom-0 left-0 h-1 bg-forest-900/30 w-full">
+                      <div className="h-full bg-forest-900 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+                  {submitting ? `${uploadProgress}%` : 'Send'}
                 </button>
               </div>
             )}
@@ -321,21 +329,24 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
     if (mediaRecorderRef.current && recording) { mediaRecorderRef.current.stop(); setRecording(false); }
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const handleSubmit = async () => {
     if (!responseType) return;
     if (responseType === 'text' && !textNote.trim()) return;
     if ((responseType === 'video' || responseType === 'audio') && !mediaBlob) return;
     setSubmitting(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append('from', 'coach');
       formData.append('type', responseType);
       if (textNote) formData.append('text', textNote);
       if (mediaBlob) formData.append('media', mediaBlob, 'reply.webm');
-      await submitReply(checkinId, formData);
+      await uploadWithProgress(`/api/checkins/${checkinId}/reply`, formData, setUploadProgress);
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
-    finally { setSubmitting(false); }
+    finally { setSubmitting(false); setUploadProgress(0); }
   };
 
   return (
@@ -394,8 +405,13 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
                 <button onClick={() => setMediaBlob(null)}
                   className="flex-1 py-2 bg-forest-800 text-earth-400 rounded-lg text-sm hover:bg-forest-600 transition-colors">Re-record</button>
                 <button onClick={handleSubmit} disabled={submitting}
-                  className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50">
-                  {submitting ? 'Sending...' : 'Send'}
+                  className="flex-1 py-2 bg-gold-500 text-forest-900 font-medium rounded-lg text-sm hover:bg-gold-400 transition-colors disabled:opacity-50 relative overflow-hidden">
+                  {submitting && uploadProgress < 100 && (
+                    <div className="absolute bottom-0 left-0 h-1 bg-forest-900/30 w-full">
+                      <div className="h-full bg-forest-900 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+                  {submitting ? `${uploadProgress}%` : 'Send'}
                 </button>
               </div>
             )}
