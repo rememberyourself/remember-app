@@ -26,19 +26,28 @@ export default function AudioPlayer({ src, className = '' }) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onLoaded = () => setDuration(audio.duration);
-    const onTime = () => { if (!dragging) setCurrentTime(audio.currentTime); };
+    const onLoaded = () => { if (audio.duration && isFinite(audio.duration)) setDuration(audio.duration); };
+    const onTime = () => {
+      if (!dragging) setCurrentTime(audio.currentTime);
+      // iOS fallback: duration may only be available after play starts
+      if (audio.duration && isFinite(audio.duration) && !duration) setDuration(audio.duration);
+    };
     const onEnded = () => { setPlaying(false); setCurrentTime(0); };
+    const onDurationChange = () => { if (audio.duration && isFinite(audio.duration)) setDuration(audio.duration); };
 
     audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('ended', onEnded);
+    // Try to load on iOS
+    audio.load();
     return () => {
       audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('timeupdate', onTime);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [dragging]);
+  }, [dragging, src]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;

@@ -243,7 +243,7 @@ export default function ClientDashboard() {
                 )}
                 {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'video' && (
                   <video 
-                    src={`/api/uploads/${latestResponse.coachResponse.mediaPath}`} 
+                    src={`/api/uploads/${latestResponse.coachResponse.mediaPath}#t=0.001`} 
                     controls 
                     preload="metadata" 
                     className="w-full rounded-lg mt-2" 
@@ -322,18 +322,18 @@ export default function ClientDashboard() {
                 { icon: '/icons/connection2.png', label: 'Connection', value: lastCheckin.ratings?.connection },
               ].map((r, i) => (
                 <div key={i} className="text-center">
-                  <img src={r.icon} alt={r.label} className="w-6 h-6 mx-auto mb-1" />
-                  <div className="text-warm-white font-medium">{r.value || '-'}</div>
+                  <img src={r.icon} alt={r.label} className="w-8 h-8 mx-auto mb-1" />
+                  <div className="text-warm-white font-medium text-lg">{r.value || '-'}</div>
                 </div>
               ))}
             </div>
             <div className="flex gap-2 flex-wrap">
-              {lastCheckin.practices?.meditation && <span className="bg-forest-700 text-earth-400 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1"><img src="/icons/meditation.png" alt="" className="w-4 h-4" /> Meditation</span>}
-              {lastCheckin.practices?.breathwork && <span className="bg-forest-700 text-earth-400 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1"><img src="/icons/breathwork.png" alt="" className="w-4 h-4" /> Breathwork</span>}
-              {lastCheckin.practices?.exercise && <span className="bg-forest-700 text-earth-400 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1"><img src="/icons/exercise.png" alt="" className="w-4 h-4" /> Exercise</span>}
-              {lastCheckin.practices?.nature && <span className="bg-forest-700 text-earth-400 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1"><img src="/icons/nature.png" alt="" className="w-4 h-4" /> Nature</span>}
+              {lastCheckin.practices?.meditation && <span className="bg-forest-700 text-earth-400 text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"><img src="/icons/meditation.png" alt="" className="w-5 h-5" /> Meditation</span>}
+              {lastCheckin.practices?.breathwork && <span className="bg-forest-700 text-earth-400 text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"><img src="/icons/breathwork.png" alt="" className="w-5 h-5" /> Breathwork</span>}
+              {lastCheckin.practices?.exercise && <span className="bg-forest-700 text-earth-400 text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"><img src="/icons/exercise.png" alt="" className="w-5 h-5" /> Exercise</span>}
+              {lastCheckin.practices?.nature && <span className="bg-forest-700 text-earth-400 text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"><img src="/icons/nature.png" alt="" className="w-5 h-5" /> Nature</span>}
               {customPractices.filter(p => lastCheckin.practices?.[`custom_${p}`]).map(p => (
-                <span key={p} className="bg-forest-700 text-earth-400 text-xs px-2 py-1 rounded-full"><img src="/icons/diamond.png" alt="" className="w-4 h-4 inline" /> {p}</span>
+                <span key={p} className="bg-forest-700 text-earth-400 text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"><img src="/icons/diamond.png" alt="" className="w-5 h-5" /> {p}</span>
               ))}
             </div>
             {/* Coach Response on latest check-in */}
@@ -347,7 +347,7 @@ export default function ClientDashboard() {
                   <p className="text-earth-300 text-sm italic">"{lastCheckin.coachResponse.text}"</p>
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'video' && (
-                  <video src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}`} controls preload="metadata" className="w-full rounded-lg mt-2" />
+                  <video src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-2" />
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'audio' && (
                   <AudioPlayer src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}`} className="mt-2" />

@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="py-8 px-4 text-center">
+    <footer className="pt-16 pb-8 px-4 text-center">
       <p className="text-earth-600 text-xs tracking-[0.2em] mb-1 heading-brand" style={{ fontSize: '14px' }}>
         Remember Yourself
       </p>

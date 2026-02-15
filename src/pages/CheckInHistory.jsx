@@ -199,10 +199,10 @@ function ThreadMessage({ msg, isCoach }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={`/api/uploads/${msg.mediaPath}`} controls preload="metadata" className="w-full rounded-lg mt-2" />
+        <video src={`/api/uploads/${msg.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
-        <AudioPlayer src={`/api/uploads/${msg.mediaPath}`} className="mt-2" />
+        <AudioPlayer src={`/api/uploads/${msg.mediaPath}#t=0.001`} className="mt-2" />
       )}
     </div>
   );
@@ -339,10 +339,10 @@ export default function CheckInHistory() {
                   <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>
                 )}
                 {c.mediaPath && c.mediaType === 'video' && (
-                  <video src={`/api/uploads/${c.mediaPath}`} controls preload="metadata" className="w-full rounded-lg mt-3" />
+                  <video src={`/api/uploads/${c.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-3" />
                 )}
                 {c.mediaPath && c.mediaType === 'audio' && (
-                  <AudioPlayer src={`/api/uploads/${c.mediaPath}`} className="mt-3" />
+                  <AudioPlayer src={`/api/uploads/${c.mediaPath}#t=0.001`} className="mt-3" />
                 )}
                 {/* Conversation Thread */}
                 {c.coachResponse && (

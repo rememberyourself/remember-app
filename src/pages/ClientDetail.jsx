@@ -270,10 +270,10 @@ function ThreadMessageCoach({ msg }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={mediaUrl(msg.mediaPath)} controls preload="metadata" className="w-full rounded-lg mt-2" />
+        <video src={mediaUrl(msg.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
-        <AudioPlayer src={mediaUrl(msg.mediaPath)} className="mt-2" />
+        <AudioPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
       )}
     </div>
   );
@@ -643,16 +643,16 @@ function ResourcesTab({ clientId }) {
               </button>
             </div>
             {r.type === 'video' && (
-              <video src={mediaUrl(r.filePath)} controls preload="metadata" className="w-full rounded-lg mt-3" />
+              <video src={mediaUrl(r.filePath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-3" />
             )}
             {r.type === 'pdf' && (
-              <a href={mediaUrl(r.filePath)} target="_blank" rel="noopener noreferrer"
+              <a href={mediaUrl(r.filePath) + "#t=0.001"} target="_blank" rel="noopener noreferrer"
                 className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-forest-700/60 hover:bg-forest-700 text-earth-300 rounded-lg text-sm transition-colors">
                 <img src="/icons/pdf-icon.png" alt="" className="w-5 h-5" /> Open PDF
               </a>
             )}
             {r.type === 'image' && (
-              <img src={mediaUrl(r.filePath)} alt={r.title} className="w-full rounded-lg mt-3 cursor-pointer hover:opacity-90 transition-opacity"
+              <img src={mediaUrl(r.filePath) + "#t=0.001"} alt={r.title} className="w-full rounded-lg mt-3 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => window.open(mediaUrl(r.filePath), '_blank')} />
             )}
           </div>
@@ -888,10 +888,10 @@ export default function ClientDetail() {
                   </div>
                   {c.textNote && <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>}
                   {c.mediaPath && c.mediaType === 'video' && (
-                    <video src={mediaUrl(c.mediaPath)} controls preload="metadata" className="w-full rounded-lg mt-3" />
+                    <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-3" />
                   )}
                   {c.mediaPath && c.mediaType === 'audio' && (
-                    <AudioPlayer src={mediaUrl(c.mediaPath)} className="mt-3" />
+                    <AudioPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />
                   )}
 
                   {/* Expanded section: AI Analysis + Coach Response */}
@@ -935,7 +935,7 @@ export default function ClientDetail() {
           <div className="space-y-4 animate-fade-in">
             {client.checkins?.filter(c => c.mediaType === 'video' && c.mediaPath).map((c, i) => (
               <div key={i} className="bg-forest-800 rounded-xl overflow-hidden border border-forest-700/50">
-                <video src={mediaUrl(c.mediaPath)} controls preload="metadata" className="w-full" />
+                <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full" />
                 <div className="p-3">
                   <span className="text-earth-400 text-sm">{formatDate(c.date, c.createdAt)}</span>
                 </div>
@@ -944,7 +944,7 @@ export default function ClientDetail() {
             {client.checkins?.filter(c => c.mediaType === 'audio' && c.mediaPath).map((c, i) => (
               <div key={`audio-${i}`} className="bg-forest-800 rounded-xl p-4 border border-forest-700/50">
                 <span className="text-earth-400 text-sm block mb-2"><img src="/icons/voice.png" alt="" className="w-5 h-5 inline mr-1" />{formatDate(c.date, c.createdAt)}</span>
-                <AudioPlayer src={mediaUrl(c.mediaPath)} />
+                <AudioPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} />
               </div>
             ))}
             {!client.checkins?.some(c => (c.mediaType === 'video' || c.mediaType === 'audio') && c.mediaPath) && (

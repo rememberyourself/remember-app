@@ -76,7 +76,7 @@ export default function Toolbox() {
                 )}
                 {r.type === 'video' && (
                   <video
-                    src={`${API_BASE}/uploads/${r.filePath}`}
+                    src={`${API_BASE}/uploads/${r.filePath}#t=0.001`}
                     controls
                     preload="metadata"
                     className="w-full rounded-lg mt-3"

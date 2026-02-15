@@ -366,8 +366,8 @@ export default function CheckIn() {
                 <div key={r.key} className={`animate-slide-up stagger-${i+1} opacity-0 bg-forest-800 rounded-xl p-4 border border-forest-700/50`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <img src={r.icon} alt={r.label} className="w-8 h-8" />
-                      <span className="text-warm-white text-sm font-medium">{r.label}</span>
+                      <img src={r.icon} alt={r.label} className="w-10 h-10" />
+                      <span className="text-warm-white text-base font-medium">{r.label}</span>
                     </div>
                     <span className="text-2xl font-light text-gold-500 w-8 text-right">{ratings[r.key]}</span>
                   </div>
@@ -379,7 +379,7 @@ export default function CheckIn() {
                     onChange={(e) => setRatings(prev => ({ ...prev, [r.key]: parseInt(e.target.value) }))}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-earth-600 text-xs mt-1">
+                  <div className="flex justify-between text-earth-600 text-sm mt-1">
                     <span>Low</span>
                     <span>High</span>
                   </div>
@@ -418,13 +418,13 @@ export default function CheckIn() {
                   }`}
                 >
                   {p.icon ? (
-                    <img src={p.icon} alt={p.label} className="w-8 h-8" />
+                    <img src={p.icon} alt={p.label} className="w-10 h-10" />
                   ) : (p.customIcon || '').startsWith('/') ? (
-                    <img src={p.customIcon} alt="" className="w-8 h-8" />
+                    <img src={p.customIcon} alt="" className="w-10 h-10" />
                   ) : (
                     <span className="text-2xl text-gold-500">{p.customIcon || '💎'}</span>
                   )}
-                  <span className="text-warm-white font-medium flex-1">{p.label}</span>
+                  <span className="text-warm-white font-medium text-base flex-1">{p.label}</span>
                   <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                     practices[p.key] ? 'bg-gold-500 border-gold-500' : 'border-earth-600'
                   }`}>
