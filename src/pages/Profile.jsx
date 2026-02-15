@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getProfile, uploadAvatar, addCustomPractice, removeCustomPractice } from '../utils/api';
+import { compressImage } from '../utils/imageCompress';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import Avatar from '../components/Avatar';
@@ -26,7 +27,10 @@ export default function Profile() {
     if (!file) return;
     setUploading(true);
     try {
-      const result = await uploadAvatar(user.id, file);
+      // Compress image to 300px max before upload (~10-30KB instead of 2-5MB)
+      const compressed = await compressImage(file, 300, 0.8);
+      const compressedFile = new File([compressed], 'avatar.jpg', { type: 'image/jpeg' });
+      const result = await uploadAvatar(user.id, compressedFile);
       setProfile(prev => ({ ...prev, avatar: result.avatar }));
       // Update auth context so avatar shows everywhere
       setUser(prev => ({ ...prev, avatar: result.avatar }));
