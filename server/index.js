@@ -2,10 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -22,23 +23,35 @@ const pool = new pg.Pool({
 
 pool.on('error', (err) => console.error('🔴 Pool error:', err.message));
 
-// Data paths (uploads still on disk)
-const UPLOADS_DIR = join(__dirname, 'uploads');
-if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+// ===== SUPABASE STORAGE =====
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://osyhjclkinguhmqcawbs.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zeWhqY2xraW5ndWhtcWNhd2JzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTAzNTc5OCwiZXhwIjoyMDg2NjExNzk4fQ.RoFZIi2f7Y3lFy8LJVmy1Wj41C9WexzRkdmwdD3Y3-Y'
+);
+
+async function uploadToSupabase(file) {
+  const ext = file.originalname.split('.').pop();
+  const filename = `${randomUUID()}.${ext}`;
+  const { data, error } = await supabase.storage.from('uploads').upload(filename, file.buffer, {
+    contentType: file.mimetype,
+    upsert: false,
+  });
+  if (error) throw new Error(`Supabase upload error: ${error.message}`);
+  return filename;
+}
+
+function getPublicUrl(filename) {
+  if (!filename) return null;
+  const { data } = supabase.storage.from('uploads').getPublicUrl(filename);
+  return data.publicUrl;
+}
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// File upload config
-const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
-  filename: (req, file, cb) => {
-    const ext = file.originalname.split('.').pop();
-    cb(null, `${randomUUID()}.${ext}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+// File upload config (memory storage for Supabase)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 // ===== AI ANALYSIS (async background) =====
 
@@ -54,9 +67,8 @@ Be direct, compassionate, and perceptive. Look beneath the surface. Notice what'
 
 Return ONLY valid JSON, no markdown fences.`;
 
-async function transcribeMedia(filePath) {
-  const fileBuffer = readFileSync(filePath);
-  const ext = filePath.split('.').pop() || 'webm';
+async function transcribeMedia(fileBuffer, ext) {
+  ext = ext || 'webm';
   const mimeMap = { webm: 'video/webm', mp4: 'video/mp4', m4a: 'audio/m4a', ogg: 'audio/ogg', wav: 'audio/wav', mp3: 'audio/mpeg' };
   const mime = mimeMap[ext] || 'application/octet-stream';
 
@@ -111,11 +123,11 @@ async function processCheckinAnalysis(checkinId, mediaType, mediaPath, textNote)
     let transcript = '';
 
     if ((mediaType === 'video' || mediaType === 'audio') && mediaPath) {
-      const fullPath = join(UPLOADS_DIR, mediaPath);
-      if (!existsSync(fullPath)) {
-        throw new Error(`Media file not found: ${fullPath}`);
-      }
-      transcript = await transcribeMedia(fullPath);
+      const { data, error } = await supabase.storage.from('uploads').download(mediaPath);
+      if (error) throw new Error(`Download error: ${error.message}`);
+      const fileBuffer = Buffer.from(await data.arrayBuffer());
+      const ext = mediaPath.split('.').pop() || 'webm';
+      transcript = await transcribeMedia(fileBuffer, ext);
       console.log(`📝 Transcribed ${mediaType}: ${transcript.substring(0, 100)}...`);
     } else if (mediaType === 'text' && textNote) {
       transcript = textNote;
@@ -204,7 +216,7 @@ app.post('/api/auth/invite', async (req, res) => {
 app.post('/api/clients/:id/avatar', upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const avatarPath = req.file.filename;
+    const avatarPath = await uploadToSupabase(req.file);
     const { rowCount } = await pool.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatarPath, req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
     res.json({ avatar: avatarPath });
@@ -301,11 +313,12 @@ app.post('/api/checkins', upload.single('media'), async (req, res) => {
     const parsedRatings = ratings ? JSON.parse(ratings) : {};
     const parsedPractices = practices ? JSON.parse(practices) : {};
 
+    const mediaFilename = req.file ? await uploadToSupabase(req.file) : null;
     const { rows } = await pool.query(
       `INSERT INTO checkins (user_id, date, ratings, practices, media_type, text_note, media_path)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [userId, date, JSON.stringify(parsedRatings), JSON.stringify(parsedPractices),
-       mediaType || 'none', textNote || '', req.file ? req.file.filename : null]
+       mediaType || 'none', textNote || '', mediaFilename]
     );
 
     const checkin = formatCheckin(rows[0]);
@@ -493,26 +506,18 @@ app.get('/api/clients/:id', async (req, res) => {
   }
 });
 
-// ===== MEDIA / UPLOADS ROUTES =====
+// ===== MEDIA / UPLOADS ROUTES (Supabase redirect) =====
 
-app.use('/api/uploads', express.static(UPLOADS_DIR, {
-  setHeaders(res, filePath) {
-    if (filePath.endsWith('.webm')) {
-      res.setHeader('Content-Type', 'video/webm');
-    }
-    res.setHeader('Accept-Ranges', 'bytes');
-  }
-}));
+app.get('/api/uploads/:filename', (req, res) => {
+  const url = getPublicUrl(req.params.filename);
+  if (!url) return res.status(404).send('Not found');
+  res.redirect(url);
+});
 
 app.get('/api/media/:filename', (req, res) => {
-  const filePath = join(UPLOADS_DIR, req.params.filename);
-  if (!existsSync(filePath)) return res.status(404).send('Not found');
-  const ext = req.params.filename.split('.').pop()?.toLowerCase();
-  if (ext === 'webm') {
-    res.setHeader('Content-Type', 'video/webm');
-  }
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.sendFile(filePath);
+  const url = getPublicUrl(req.params.filename);
+  if (!url) return res.status(404).send('Not found');
+  res.redirect(url);
 });
 
 // ===== COACH RESPONSE ROUTE =====
@@ -522,9 +527,10 @@ app.post('/api/checkins/:checkinId/response', upload.single('media'), async (req
     const { checkinId } = req.params;
     const { type, text } = req.body;
 
+    const mediaFilename = req.file ? await uploadToSupabase(req.file) : null;
     const coachResponse = {
       type: type || 'text',
-      mediaPath: req.file ? req.file.filename : null,
+      mediaPath: mediaFilename,
       text: text || '',
       timestamp: new Date().toISOString(),
     };
@@ -565,10 +571,11 @@ app.post('/api/checkins/:checkinId/reply', upload.single('media'), async (req, r
     if (checkinRows.length === 0) return res.status(404).json({ error: 'Check-in not found' });
 
     // Insert reply
+    const replyMediaFilename = req.file ? await uploadToSupabase(req.file) : null;
     await pool.query(
       `INSERT INTO replies (checkin_id, "from", type, media_path, text)
        VALUES ($1, $2, $3, $4, $5)`,
-      [checkinId, from, type || 'text', req.file ? req.file.filename : null, text || '']
+      [checkinId, from, type || 'text', replyMediaFilename, text || '']
     );
 
     // Return full checkin with all replies
@@ -603,12 +610,13 @@ app.post('/api/clients/:id/resources', upload.single('file'), async (req, res) =
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
     const fileType = ['pdf'].includes(ext) ? 'pdf' : imageExts.includes(ext) ? 'image' : 'video';
 
+    const resourceFilename = await uploadToSupabase(req.file);
     const resource = {
       id: randomUUID(),
       title: title.trim(),
       description: (description || '').trim(),
       type: fileType,
-      filePath: req.file.filename,
+      filePath: resourceFilename,
       originalName: req.file.originalname,
       timestamp: new Date().toISOString(),
     };
