@@ -66,8 +66,8 @@ export default function NavBar() {
                   : 'text-earth-600 hover:text-earth-400'
               }`}
             >
-              <img src={link.iconSrc} alt={link.label} className={`w-10 h-10 ${link.extraClass || ''}`} />
-              <span className="text-[11px] uppercase tracking-wider">{link.label}</span>
+              <img src={link.iconSrc} alt={link.label} className={`w-12 h-12 ${link.extraClass || ''}`} />
+              <span className="text-xs uppercase tracking-wider">{link.label}</span>
             </button>
           ))}
         </div>

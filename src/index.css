@@ -138,8 +138,13 @@ input[type="range"]::-moz-range-thumb {
 .stagger-5 { animation-delay: 0.5s; }
 
 /* PWA standalone mode: extra top padding for safe area (notch) */
-@supports (padding-top: env(safe-area-inset-top)) {
+.pwa-safe-top {
+  padding-top: calc(4.5rem + env(safe-area-inset-top, 0px)) !important;
+}
+
+/* In standalone PWA mode, add even more space since no browser chrome */
+@media all and (display-mode: standalone) {
   .pwa-safe-top {
-    padding-top: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(5.5rem + env(safe-area-inset-top, 0px)) !important;
   }
 }

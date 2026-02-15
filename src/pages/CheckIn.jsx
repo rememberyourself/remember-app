@@ -79,11 +79,37 @@ export default function CheckIn() {
     }))
   ];
 
+  // Start camera preview when video type is selected (before recording)
+  useEffect(() => {
+    if (mediaType === 'video' && !mediaBlob && !recording) {
+      let cancelled = false;
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 } }, audio: false })
+        .then(stream => {
+          if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+          streamRef.current = stream;
+          if (videoPreviewRef.current) {
+            videoPreviewRef.current.srcObject = stream;
+            videoPreviewRef.current.play().catch(() => {});
+          }
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+        // Don't stop stream here — startRecording will reuse or replace it
+      };
+    }
+  }, [mediaType, mediaBlob, recording]);
+
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
         ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
         : { audio: true };
+
+      // Stop preview-only stream before getting full stream with audio
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -277,7 +303,10 @@ export default function CheckIn() {
                 </div>
 
                 {!mediaBlob && !recording && (
-                  <button onClick={() => { setMediaType(null); }}
+                  <button onClick={() => { 
+                    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+                    setMediaType(null); 
+                  }}
                     className="w-full text-earth-600 text-sm py-2 hover:text-earth-400 transition-colors">
                     ← Choose different type
                   </button>
@@ -317,7 +346,7 @@ export default function CheckIn() {
                     onChange={(e) => setRatings(prev => ({ ...prev, [r.key]: parseInt(e.target.value) }))}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-earth-700 text-[10px] mt-1">
+                  <div className="flex justify-between text-earth-600 text-xs mt-1">
                     <span>Low</span>
                     <span>High</span>
                   </div>
@@ -470,7 +499,15 @@ export default function CheckIn() {
               </button>
               <button onClick={handleSubmit} disabled={submitting}
                 className="flex-1 py-4 bg-gold-500 hover:bg-gold-400 text-forest-900 font-medium rounded-xl transition-all disabled:opacity-50">
-                {submitting ? 'Submitting...' : 'Submit Check-in'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    {mediaBlob ? 'Uploading media...' : 'Submitting...'}
+                  </span>
+                ) : 'Submit Check-in'}
               </button>
             </div>
           </div>
