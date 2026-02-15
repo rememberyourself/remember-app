@@ -10,6 +10,9 @@ const API = '/api';
  * @returns {Promise<string>} The storage path (filename) in Supabase
  */
 export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
+  // Show 0% immediately so UI switches from "Sending..." to "Uploading... 0%"
+  if (onProgress) onProgress(0);
+  
   // Step 1: Get a signed upload URL from our server
   const res = await fetch(`${API}/upload-url`, {
     method: 'POST',
