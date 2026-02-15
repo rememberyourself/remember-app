@@ -279,7 +279,7 @@ export default function ClientDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-earth-500 text-xs uppercase tracking-wider mb-1">Current Streak</p>
-              <p className="text-4xl font-light text-gold-500">{streak} <span className="text-lg text-earth-500">days</span></p>
+              <p className="text-4xl font-light text-gold-500">{streak} <span className="text-lg text-earth-500">{streak === 1 ? 'day' : 'days'}</span></p>
             </div>
             <img src="/icons/streak-flame.png" alt="Streak" className="w-14 h-14 opacity-90" />
           </div>
