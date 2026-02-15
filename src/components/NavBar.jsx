@@ -27,7 +27,7 @@ export default function NavBar() {
   return (
     <>
       {/* Top bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-forest-900/80 backdrop-blur-xl border-b border-forest-700/50">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-forest-900/80 backdrop-blur-xl border-b border-forest-700/50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <img src="/app-icon.png" alt="Remember" className="w-14 h-14 rounded-full" />
