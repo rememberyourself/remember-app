@@ -35,6 +35,7 @@ export default function CheckIn() {
   const [newCustomName, setNewCustomName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
@@ -154,6 +155,7 @@ export default function CheckIn() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append('userId', user.id);
@@ -170,13 +172,34 @@ export default function CheckIn() {
         formData.append('textNote', textNote);
       }
 
-      await createCheckin(formData);
+      // Use XMLHttpRequest for upload progress tracking
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/checkins');
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Upload failed: ${xhr.status}`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        
+        xhr.send(formData);
+      });
+
       setSubmitted(true);
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch {
       alert('Failed to submit. Please try again.');
     } finally {
       setSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -289,14 +312,24 @@ export default function CheckIn() {
                       <div className="w-8 h-8 bg-white rounded-sm" />
                     </button>
                   ) : (
-                    <div className="flex gap-3 w-full">
-                      <button onClick={() => { setMediaBlob(null); }}
-                        className="flex-1 py-3 bg-forest-800 text-earth-400 rounded-xl hover:bg-forest-700 transition-colors">
-                        Re-record
-                      </button>
-                      <button onClick={() => setStep(1)}
-                        className="flex-1 py-3 bg-gold-500 text-forest-900 font-medium rounded-xl hover:bg-gold-400 transition-colors">
-                        Continue
+                    <div className="space-y-3 w-full">
+                      <div className="flex gap-3">
+                        <button onClick={() => { setMediaBlob(null); }}
+                          className="flex-1 py-3 bg-forest-800 text-earth-400 rounded-xl hover:bg-forest-700 transition-colors">
+                          🔄 Re-record
+                        </button>
+                        <button onClick={() => setStep(1)}
+                          className="flex-1 py-3 bg-gold-500 text-forest-900 font-medium rounded-xl hover:bg-gold-400 transition-colors">
+                          Continue →
+                        </button>
+                      </div>
+                      <button onClick={() => { 
+                        setMediaBlob(null); 
+                        if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+                        setMediaType(null); 
+                      }}
+                        className="w-full py-2 text-red-400/70 text-sm hover:text-red-400 transition-colors">
+                        🗑 Delete recording
                       </button>
                     </div>
                   )}
@@ -498,15 +531,22 @@ export default function CheckIn() {
                 Back
               </button>
               <button onClick={handleSubmit} disabled={submitting}
-                className="flex-1 py-4 bg-gold-500 hover:bg-gold-400 text-forest-900 font-medium rounded-xl transition-all disabled:opacity-50">
+                className="flex-1 py-4 bg-gold-500 hover:bg-gold-400 text-forest-900 font-medium rounded-xl transition-all disabled:opacity-50 relative overflow-hidden">
                 {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    {mediaBlob ? 'Uploading media...' : 'Submitting...'}
-                  </span>
+                  <>
+                    {mediaBlob && uploadProgress < 100 && (
+                      <div className="absolute bottom-0 left-0 h-1 bg-forest-900/30 w-full">
+                        <div className="h-full bg-forest-900 transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
+                      </div>
+                    )}
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      {mediaBlob ? `Uploading... ${uploadProgress}%` : 'Submitting...'}
+                    </span>
+                  </>
                 ) : 'Submit Check-in'}
               </button>
             </div>
