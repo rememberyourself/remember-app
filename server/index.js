@@ -197,6 +197,18 @@ app.post('/api/upload-url', async (req, res) => {
   }
 });
 
+// Simple media upload endpoint — receives file via multer, uploads to Supabase, returns path
+app.post('/api/upload-media', upload.single('media'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const filename = await uploadToSupabase(req.file);
+    res.json({ path: filename });
+  } catch (err) {
+    console.error('Upload media error:', err.message);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
 // ===== AUTH ROUTES =====
 
 app.post('/api/auth/login', async (req, res) => {
