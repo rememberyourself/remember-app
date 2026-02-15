@@ -136,3 +136,10 @@ input[type="range"]::-moz-range-thumb {
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* PWA standalone mode: extra top padding for safe area (notch) */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .pwa-safe-top {
+    padding-top: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+  }
+}
