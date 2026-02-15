@@ -207,7 +207,7 @@ export default function CheckIn() {
     return (
       <div className="min-h-dvh bg-forest-900 flex items-center justify-center">
         <div className="text-center animate-fade-in">
-          <div className="text-6xl mb-4">🌿</div>
+          <img src="/icons/checkmark.png" alt="Complete" className="w-16 h-16 mx-auto mb-4" />
           <h2 className="text-2xl font-light text-warm-white mb-2">Check-in Complete</h2>
           <p className="text-earth-500">Thank you for showing up today.</p>
         </div>
