@@ -265,7 +265,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
 function ThreadMessageCoach({ msg }) {
   const isCoach = msg.from === 'coach';
   const borderColor = isCoach ? 'border-l-[#C9A96E]/60' : 'border-l-green-600/60';
-  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-7 h-7 inline" /> You (Coach)</> : '🙋 Client';
+  const label = isCoach ? <><img src="/icons/coach-response.png" alt="" className="w-7 h-7 inline" /> You (Coach)</> : <><img src="/icons/reply2.png" alt="" className="w-7 h-7 inline" /> Client</>;
   const labelColor = isCoach ? 'text-gold-500' : 'text-green-400';
 
   return (
@@ -724,7 +724,7 @@ export default function ClientDetail() {
   }));
 
   return (
-    <div className="min-h-dvh bg-forest-900 pb-24 pt-16 pwa-safe-top">
+    <div className="min-h-dvh bg-forest-900 pb-36 pt-16 pwa-safe-top">
       <NavBar />
       <div className="max-w-lg mx-auto px-4 py-6">
         {/* Header */}

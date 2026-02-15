@@ -18,7 +18,7 @@ export default function Toolbox() {
   }, [user.id]);
 
   return (
-    <div className="min-h-dvh bg-forest-900 pb-24 pt-16 pwa-safe-top">
+    <div className="min-h-dvh bg-forest-900 pb-36 pt-16 pwa-safe-top">
       <NavBar />
       <div className="max-w-lg mx-auto px-4 py-6">
         <div className="flex items-center gap-3 mb-6">
