@@ -43,6 +43,24 @@ function DashboardReplyForm({ checkinId, onSubmitted, onCancel }) {
   const videoPreviewRef = useRef(null);
   const chunksRef = useRef([]);
 
+  // Start camera preview when video type is selected (before recording)
+  useEffect(() => {
+    if (responseType === 'video' && !mediaBlob && !recording) {
+      let cancelled = false;
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
+        .then(stream => {
+          if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+          streamRef.current = stream;
+          if (videoPreviewRef.current) {
+            videoPreviewRef.current.srcObject = stream;
+            videoPreviewRef.current.play().catch(() => {});
+          }
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }
+  }, [responseType, mediaBlob, recording]);
+
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'

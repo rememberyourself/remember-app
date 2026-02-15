@@ -26,17 +26,24 @@ export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   const { url, path } = await res.json();
 
   // Step 2: Upload directly to Supabase using the signed URL (with progress)
+  const fileSize = file.size || 0;
   await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
+      if (onProgress) {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        } else if (fileSize > 0) {
+          // Fallback: use known file size if lengthComputable is false (iOS Safari)
+          onProgress(Math.round((e.loaded / fileSize) * 100));
+        }
       }
     });
     xhr.addEventListener('load', () => {
+      if (onProgress) onProgress(100);
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`Direct upload failed: ${xhr.status} ${xhr.responseText}`));
     });
