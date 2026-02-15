@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress } from '../utils/api';
+import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
@@ -79,7 +80,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -131,13 +132,17 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
     setSubmitting(true);
     setUploadProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('type', responseType);
-      if (textNote) formData.append('text', textNote);
+      let mediaPath = null;
       if (mediaBlob) {
-        formData.append('media', mediaBlob, `response.webm`);
+        const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+        mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
-      await uploadWithProgress(`/api/checkins/${checkinId}/response`, formData, setUploadProgress);
+      const res = await fetch(`/api/checkins/${checkinId}/response`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: responseType, text: textNote || '', media_path: mediaPath }),
+      });
+      if (!res.ok) throw new Error('Failed');
       onSubmitted();
     } catch {
       alert('Failed to submit response.');
@@ -195,7 +200,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
         <div className="space-y-3">
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-              <video ref={videoPreviewRef} className="w-full h-full object-cover" muted playsInline />
+              <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
               {mediaBlob && !recording && (
                 <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />
               )}
@@ -278,7 +283,7 @@ function ThreadMessageCoach({ msg }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={mediaUrl(msg.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-2" />
+        <video src={mediaUrl(msg.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
         <AudioPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
@@ -302,7 +307,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -338,12 +343,17 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
     setSubmitting(true);
     setUploadProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('from', 'coach');
-      formData.append('type', responseType);
-      if (textNote) formData.append('text', textNote);
-      if (mediaBlob) formData.append('media', mediaBlob, 'reply.webm');
-      await uploadWithProgress(`/api/checkins/${checkinId}/reply`, formData, setUploadProgress);
+      let mediaPath = null;
+      if (mediaBlob) {
+        const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+        mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
+      }
+      const res = await fetch(`/api/checkins/${checkinId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'coach', type: responseType, text: textNote || '', media_path: mediaPath }),
+      });
+      if (!res.ok) throw new Error('Failed');
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
     finally { setSubmitting(false); setUploadProgress(0); }
@@ -382,7 +392,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
         <div className="space-y-3">
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-              <video ref={videoPreviewRef} className="w-full h-full object-cover" muted playsInline />
+              <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
               {mediaBlob && !recording && <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />}
             </div>
           )}
@@ -659,7 +669,7 @@ function ResourcesTab({ clientId }) {
               </button>
             </div>
             {r.type === 'video' && (
-              <video src={mediaUrl(r.filePath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-3" />
+              <video src={mediaUrl(r.filePath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-3" />
             )}
             {r.type === 'pdf' && (
               <a href={mediaUrl(r.filePath) + "#t=0.001"} target="_blank" rel="noopener noreferrer"
@@ -904,7 +914,7 @@ export default function ClientDetail() {
                   </div>
                   {c.textNote && <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>}
                   {c.mediaPath && c.mediaType === 'video' && (
-                    <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full rounded-lg mt-3" />
+                    <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-3" />
                   )}
                   {c.mediaPath && c.mediaType === 'audio' && (
                     <AudioPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />
@@ -951,7 +961,7 @@ export default function ClientDetail() {
           <div className="space-y-4 animate-fade-in">
             {client.checkins?.filter(c => c.mediaType === 'video' && c.mediaPath).map((c, i) => (
               <div key={i} className="bg-forest-800 rounded-xl overflow-hidden border border-forest-700/50">
-                <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="metadata" className="w-full" />
+                <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full" />
                 <div className="p-3">
                   <span className="text-earth-400 text-sm">{formatDate(c.date, c.createdAt)}</span>
                 </div>

@@ -181,6 +181,22 @@ function formatCheckin(row) {
   };
 }
 
+// ===== SIGNED UPLOAD URL (for direct browser → Supabase uploads) =====
+
+app.post('/api/upload-url', async (req, res) => {
+  try {
+    const { filename, contentType } = req.body;
+    const ext = (filename || 'file.webm').split('.').pop();
+    const storagePath = `${randomUUID()}.${ext}`;
+    const { data, error } = await supabase.storage.from('uploads').createSignedUploadUrl(storagePath);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ url: data.signedUrl, path: storagePath });
+  } catch (err) {
+    console.error('Upload URL error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ===== AUTH ROUTES =====
 
 app.post('/api/auth/login', async (req, res) => {
@@ -310,10 +326,11 @@ app.get('/api/checkins/latest-response/:clientId', async (req, res) => {
 app.post('/api/checkins', upload.single('media'), async (req, res) => {
   try {
     const { userId, date, ratings, practices, mediaType, textNote } = req.body;
-    const parsedRatings = ratings ? JSON.parse(ratings) : {};
-    const parsedPractices = practices ? JSON.parse(practices) : {};
+    const parsedRatings = typeof ratings === 'string' ? JSON.parse(ratings) : (ratings || {});
+    const parsedPractices = typeof practices === 'string' ? JSON.parse(practices) : (practices || {});
 
-    const mediaFilename = req.file ? await uploadToSupabase(req.file) : null;
+    // Support direct Supabase upload (media_path in body) or legacy multer upload
+    const mediaFilename = req.body.media_path || (req.file ? await uploadToSupabase(req.file) : null);
     const { rows } = await pool.query(
       `INSERT INTO checkins (user_id, date, ratings, practices, media_type, text_note, media_path)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -527,7 +544,7 @@ app.post('/api/checkins/:checkinId/response', upload.single('media'), async (req
     const { checkinId } = req.params;
     const { type, text } = req.body;
 
-    const mediaFilename = req.file ? await uploadToSupabase(req.file) : null;
+    const mediaFilename = req.body.media_path || (req.file ? await uploadToSupabase(req.file) : null);
     const coachResponse = {
       type: type || 'text',
       mediaPath: mediaFilename,
@@ -570,8 +587,8 @@ app.post('/api/checkins/:checkinId/reply', upload.single('media'), async (req, r
     const { rows: checkinRows } = await pool.query('SELECT * FROM checkins WHERE id = $1', [checkinId]);
     if (checkinRows.length === 0) return res.status(404).json({ error: 'Check-in not found' });
 
-    // Insert reply
-    const replyMediaFilename = req.file ? await uploadToSupabase(req.file) : null;
+    // Insert reply — support direct Supabase upload (media_path) or legacy multer
+    const replyMediaFilename = req.body.media_path || (req.file ? await uploadToSupabase(req.file) : null);
     await pool.query(
       `INSERT INTO replies (checkin_id, "from", type, media_path, text)
        VALUES ($1, $2, $3, $4, $5)`,

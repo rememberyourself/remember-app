@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { createCheckin, addCustomPractice, getProfile } from '../utils/api';
+import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 
@@ -84,7 +85,7 @@ export default function CheckIn() {
   useEffect(() => {
     if (mediaType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
         .then(stream => {
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
           streamRef.current = stream;
@@ -104,7 +105,7 @@ export default function CheckIn() {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
 
       // Stop preview-only stream before getting full stream with audio
@@ -157,41 +158,28 @@ export default function CheckIn() {
     setSubmitting(true);
     setUploadProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('userId', user.id);
-      formData.append('date', new Date().toISOString().split('T')[0]);
-      formData.append('ratings', JSON.stringify(ratings));
-      formData.append('practices', JSON.stringify(practices));
-      formData.append('mediaType', mediaType || 'none');
-      
+      // Step 1: Upload media directly to Supabase (if any)
+      let mediaPath = null;
       if (mediaBlob) {
-        const ext = mediaType === 'video' ? 'webm' : 'webm';
-        formData.append('media', mediaBlob, `checkin.${ext}`);
-      }
-      if (textNote) {
-        formData.append('textNote', textNote);
+        const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+        mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
 
-      // Use XMLHttpRequest for upload progress tracking
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/checkins');
-        
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        });
-        
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`Upload failed: ${xhr.status}`));
-        });
-        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
-        
-        xhr.send(formData);
+      // Step 2: Send metadata to server (no media file, just the path)
+      const res = await fetch('/api/checkins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          date: new Date().toISOString().split('T')[0],
+          ratings,
+          practices,
+          mediaType: mediaType || 'none',
+          textNote: textNote || '',
+          media_path: mediaPath,
+        }),
       });
+      if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
 
       setSubmitted(true);
       setTimeout(() => navigate('/dashboard'), 2000);
@@ -283,7 +271,7 @@ export default function CheckIn() {
               <div className="space-y-4">
                 {mediaType === 'video' && (
                   <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-                    <video ref={videoPreviewRef} className="w-full h-full object-cover" muted playsInline />
+                    <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
                     {mediaBlob && !recording && (
                       <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />
                     )}

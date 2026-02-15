@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getCheckins, submitReply, uploadWithProgress } from '../utils/api';
+import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
@@ -63,7 +64,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -99,13 +100,17 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
     if ((responseType === 'video' || responseType === 'audio') && !mediaBlob) return;
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('from', 'client');
-      formData.append('type', responseType);
-      if (textNote) formData.append('text', textNote);
-      if (mediaBlob) formData.append('media', mediaBlob, 'reply.webm');
-      const API = import.meta.env.VITE_API_URL || '';
-      await uploadWithProgress(`${API}/api/checkins/${checkinId}/reply`, formData, (pct) => setUploadProgress(pct));
+      let mediaPath = null;
+      if (mediaBlob) {
+        const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+        mediaPath = await uploadMediaDirect(mediaBlob, ext, (pct) => setUploadProgress(pct));
+      }
+      const res = await fetch(`/api/checkins/${checkinId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'client', type: responseType, text: textNote || '', media_path: mediaPath }),
+      });
+      if (!res.ok) throw new Error('Failed');
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
     finally { setSubmitting(false); setUploadProgress(null); }
@@ -150,7 +155,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
         <div className="space-y-3">
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-              <video ref={videoPreviewRef} className="w-full h-full object-cover" muted playsInline />
+              <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
               {mediaBlob && !recording && <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />}
             </div>
           )}
@@ -211,7 +216,7 @@ function ThreadMessage({ msg, isCoach }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={`/api/uploads/${msg.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-2" />
+        <video src={`/api/uploads/${msg.mediaPath}#t=0.001`} controls preload="auto" className="w-full rounded-lg mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
         <AudioPlayer src={`/api/uploads/${msg.mediaPath}#t=0.001`} className="mt-2" />
@@ -351,7 +356,7 @@ export default function CheckInHistory() {
                   <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>
                 )}
                 {c.mediaPath && c.mediaType === 'video' && (
-                  <video src={`/api/uploads/${c.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-3" />
+                  <video src={`/api/uploads/${c.mediaPath}#t=0.001`} controls preload="auto" className="w-full rounded-lg mt-3" />
                 )}
                 {c.mediaPath && c.mediaType === 'audio' && (
                   <AudioPlayer src={`/api/uploads/${c.mediaPath}#t=0.001`} className="mt-3" />

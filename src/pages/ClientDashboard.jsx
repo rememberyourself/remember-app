@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress } from '../utils/api';
+import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
@@ -45,7 +46,7 @@ function DashboardReplyForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 720 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -84,12 +85,17 @@ function DashboardReplyForm({ checkinId, onSubmitted, onCancel }) {
     setSubmitting(true);
     setUploadProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('from', 'client');
-      formData.append('type', responseType);
-      if (textNote) formData.append('text', textNote);
-      if (mediaBlob) formData.append('media', mediaBlob, 'reply.webm');
-      await uploadWithProgress(`/api/checkins/${checkinId}/reply`, formData, setUploadProgress);
+      let mediaPath = null;
+      if (mediaBlob) {
+        const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
+        mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
+      }
+      const res = await fetch(`/api/checkins/${checkinId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'client', type: responseType, text: textNote || '', media_path: mediaPath }),
+      });
+      if (!res.ok) throw new Error('Failed');
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
     finally { setSubmitting(false); setUploadProgress(0); }
@@ -125,7 +131,7 @@ function DashboardReplyForm({ checkinId, onSubmitted, onCancel }) {
         <div className="space-y-3">
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-              <video ref={videoPreviewRef} className="w-full h-full object-cover" muted playsInline />
+              <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
               {mediaBlob && !recording && <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />}
             </div>
           )}
@@ -253,7 +259,7 @@ export default function ClientDashboard() {
                   <video 
                     src={`/api/uploads/${latestResponse.coachResponse.mediaPath}#t=0.001`} 
                     controls 
-                    preload="metadata" 
+                    preload="auto" 
                     className="w-full rounded-lg mt-2" 
                   />
                 )}
@@ -355,7 +361,7 @@ export default function ClientDashboard() {
                   <p className="text-earth-300 text-sm italic">"{lastCheckin.coachResponse.text}"</p>
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'video' && (
-                  <video src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}#t=0.001`} controls preload="metadata" className="w-full rounded-lg mt-2" />
+                  <video src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}#t=0.001`} controls preload="auto" className="w-full rounded-lg mt-2" />
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'audio' && (
                   <AudioPlayer src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}`} className="mt-2" />
