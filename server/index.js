@@ -53,6 +53,30 @@ app.use(express.json());
 // File upload config (memory storage for Supabase)
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
+// ===== TELEGRAM NOTIFICATION =====
+
+async function sendTelegramNotification(userId, ratings, mediaType, date) {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) { console.log('⚠️ TELEGRAM_BOT_TOKEN not set, skipping notification'); return; }
+
+    const { rows } = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+    const clientName = rows[0]?.name || 'Unknown';
+
+    const r = ratings || {};
+    const message = `🔔 New Check-in from ${clientName}\n📊 Heart: ${r.heart || '-'} | Mind: ${r.mind || '-'} | Presence: ${r.presence || '-'} | Energy: ${r.energy || '-'} | Connection: ${r.connection || '-'}\n🎥 Type: ${mediaType || 'none'}\n📅 ${date || new Date().toISOString().split('T')[0]}`;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: '1379182535', text: message }),
+    });
+    console.log('📨 Telegram notification sent for check-in from', clientName);
+  } catch (err) {
+    console.error('❌ Telegram notification failed:', err.message);
+  }
+}
+
 // ===== AI ANALYSIS (async background) =====
 
 const COACHING_SYSTEM_PROMPT = `You are an experienced men's work coach analyzing a client's check-in. This is a context of masculine self-development — presence, vulnerability, authenticity, heart vs mind, shadow work, and personal responsibility.
@@ -256,6 +280,19 @@ app.post('/api/clients/:id/avatar', upload.single('avatar'), async (req, res) =>
   }
 });
 
+// ===== LAST SEEN (for client badge) =====
+
+app.post('/api/clients/:id/seen', async (req, res) => {
+  try {
+    const { rowCount } = await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update last_seen error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ===== CUSTOM PRACTICES ROUTES =====
 
 app.post('/api/clients/:id/practices', async (req, res) => {
@@ -330,6 +367,13 @@ app.get('/api/checkins/latest-response/:clientId', async (req, res) => {
     checkin.replies = replies.map(r => ({
       id: r.id, from: r.from, type: r.type, mediaPath: r.media_path, text: r.text, timestamp: r.timestamp,
     }));
+
+    // Check if there's a new response the client hasn't seen
+    const { rows: userRows } = await pool.query('SELECT last_seen FROM users WHERE id = $1', [req.params.clientId]);
+    const lastSeen = userRows[0]?.last_seen;
+    const responseTimestamp = checkin.coachResponse?.timestamp;
+    checkin.hasNewResponse = !!(responseTimestamp && (!lastSeen || new Date(responseTimestamp) > new Date(lastSeen)));
+
     res.json(checkin);
   } catch (err) {
     console.error('Latest response error:', err.message);
@@ -354,6 +398,9 @@ app.post('/api/checkins', upload.single('media'), async (req, res) => {
 
     const checkin = formatCheckin(rows[0]);
     res.status(201).json(checkin);
+
+    // Fire-and-forget Telegram notification to coach
+    sendTelegramNotification(userId, parsedRatings, mediaType, date);
 
     // Fire-and-forget async AI analysis
     if (checkin.mediaType === 'video' || checkin.mediaType === 'audio' || checkin.mediaType === 'text') {
@@ -411,6 +458,12 @@ app.get('/api/clients', async (req, res) => {
         'SELECT date FROM checkins WHERE user_id = $1 ORDER BY date DESC', [u.id]
       );
 
+      // Check for unresponded check-ins
+      const { rows: unrespondedRows } = await pool.query(
+        'SELECT COUNT(*) as count FROM checkins WHERE user_id = $1 AND coach_response IS NULL', [u.id]
+      );
+      const unrespondedCount = parseInt(unrespondedRows[0]?.count || '0');
+
       // Calculate streak
       let streak = 0;
       const today = new Date();
@@ -428,6 +481,8 @@ app.get('/api/clients', async (req, res) => {
         lastCheckin: userCheckins[0]?.date || null,
         totalCheckins: userCheckins.length, streak,
         code: u.code, createdAt: u.created_at || null,
+        hasNewCheckins: unrespondedCount > 0,
+        unrespondedCount,
       });
     }
 

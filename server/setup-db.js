@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS replies (
   timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Add last_seen column if not exists
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_seen') THEN
+    ALTER TABLE users ADD COLUMN last_seen TIMESTAMPTZ;
+  END IF;
+END $$;
+
 -- Index for fast checkin lookups
 CREATE INDEX IF NOT EXISTS idx_checkins_user_id ON checkins(user_id);
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(date DESC);

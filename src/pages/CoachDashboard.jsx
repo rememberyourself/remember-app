@@ -267,7 +267,14 @@ export default function CoachDashboard() {
                   <Avatar name={client.name} avatar={client.avatar} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-warm-white font-medium">{client.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-warm-white font-medium">{client.name}</h3>
+                        {client.hasNewCheckins && (
+                          <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                            {client.unrespondedCount}
+                          </span>
+                        )}
+                      </div>
                       {client.streak > 0 && (
                         <span className="text-gold-500 text-sm flex items-center gap-1"><img src="/icons/streak-flame.png" alt="" className="w-4 h-4" />{client.streak}</span>
                       )}

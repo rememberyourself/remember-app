@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { getCheckins, submitReply, uploadWithProgress } from '../utils/api';
+import { getCheckins, submitReply, uploadWithProgress, markSeen } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -253,7 +253,11 @@ export default function CheckInHistory() {
     getCheckins(user.id).then(setCheckins).catch(() => {});
   };
 
-  useEffect(() => { loadCheckins(); }, [user.id]);
+  useEffect(() => {
+    loadCheckins();
+    // Mark as seen so badge clears
+    markSeen(user.id).catch(() => {});
+  }, [user.id]);
 
   const chartData = [...checkins].reverse().map(c => ({
     date: c.date?.slice(5),

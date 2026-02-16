@@ -201,11 +201,15 @@ export default function ClientDashboard() {
   const [streak, setStreak] = useState(0);
   const [customPractices, setCustomPractices] = useState([]);
   const [latestResponse, setLatestResponse] = useState(null);
+  const [hasNewResponse, setHasNewResponse] = useState(false);
   const [showReply, setShowReply] = useState(false);
 
   const loadData = () => {
     getProfile(user.id).then(p => setCustomPractices(p.customPractices || [])).catch(() => {});
-    getLatestCoachResponse(user.id).then(data => setLatestResponse(data)).catch(() => {});
+    getLatestCoachResponse(user.id).then(data => {
+      setLatestResponse(data);
+      setHasNewResponse(data?.hasNewResponse || false);
+    }).catch(() => {});
     getCheckins(user.id).then(data => {
       setCheckins(data);
       let s = 0;
@@ -256,9 +260,16 @@ export default function ClientDashboard() {
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold-500/60 via-gold-500 to-gold-500/60" />
               
               <div className="flex items-center gap-2 mb-3">
-                <img src="/icons/coach-response.png" alt="Coach" className="w-10 h-10" />
+                <div className="relative">
+                  <img src="/icons/coach-response.png" alt="Coach" className="w-10 h-10" />
+                  {hasNewResponse && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-forest-800 animate-pulse" />
+                  )}
+                </div>
                 <div>
-                  <h3 className="text-warm-white font-medium text-sm">Latest response from your coach</h3>
+                  <h3 className="text-warm-white font-medium text-sm">
+                    {hasNewResponse ? 'New response from your coach!' : 'Latest response from your coach'}
+                  </h3>
                   <p className="text-earth-500 text-xs">
                     {latestResponse.coachResponse.timestamp
                       ? new Date(latestResponse.coachResponse.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -388,9 +399,12 @@ export default function ClientDashboard() {
             )}
             <button
               onClick={() => navigate('/history')}
-              className="mt-4 text-gold-500 text-sm hover:text-gold-400 transition-colors"
+              className="mt-4 text-gold-500 text-sm hover:text-gold-400 transition-colors flex items-center gap-2"
             >
               View full history →
+              {hasNewResponse && (
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+              )}
             </button>
           </div>
         )}

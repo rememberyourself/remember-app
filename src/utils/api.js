@@ -104,6 +104,12 @@ export async function getLatestCoachResponse(clientId) {
   return res.json();
 }
 
+export async function markSeen(clientId) {
+  const res = await fetch(`${API}/clients/${clientId}/seen`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to mark seen');
+  return res.json();
+}
+
 export async function submitReply(checkinId, formData) {
   const res = await fetch(`${API}/checkins/${checkinId}/reply`, {
     method: 'POST',
