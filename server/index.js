@@ -115,30 +115,29 @@ async function transcribeMedia(fileBuffer, ext) {
 }
 
 async function analyzeText(text) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      system: COACHING_SYSTEM_PROMPT,
+      model: 'gpt-4o',
       messages: [
+        { role: 'system', content: COACHING_SYSTEM_PROMPT },
         { role: 'user', content: `Check-in transcript:\n\n${text}` },
       ],
       temperature: 0.7,
+      max_tokens: 2048,
     }),
   });
 
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Claude API error ${resp.status}: ${errText}`);
+    throw new Error(`OpenAI API error ${resp.status}: ${errText}`);
   }
   const data = await resp.json();
-  const content = data.content?.[0]?.text || '';
+  const content = data.choices?.[0]?.message?.content || '';
   const cleaned = content.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
   return JSON.parse(cleaned);
 }
