@@ -747,6 +747,16 @@ app.delete('/api/clients/:id/resources/:resourceId', async (req, res) => {
 app.post('/api/checkins/:checkinId/analysis', async (req, res) => {
   try {
     const { checkinId } = req.params;
+    
+    // If body has retrigger=true, re-run AI analysis
+    if (req.body.retrigger) {
+      const { rows } = await pool.query('SELECT * FROM checkins WHERE id = $1', [checkinId]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Check-in not found' });
+      const checkin = rows[0];
+      processCheckinAnalysis(checkinId, checkin.media_type, checkin.media_path, checkin.text_note);
+      return res.json({ status: 'analysis re-triggered', checkinId });
+    }
+
     const { keyPoints, mood, patterns, suggestedQuestions } = req.body;
 
     const aiAnalysis = {
