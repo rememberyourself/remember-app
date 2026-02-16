@@ -69,6 +69,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   const [responseType, setResponseType] = useState(null);
   const [recording, setRecording] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
+  const [mediaBlobUrl, setMediaBlobUrl] = useState(null);
   const [textNote, setTextNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -76,6 +77,17 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
   const chunksRef = useRef([]);
+
+  // Stable blob URL — prevents video flicker during upload progress updates
+  useEffect(() => {
+    if (mediaBlob) {
+      const url = URL.createObjectURL(mediaBlob);
+      setMediaBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setMediaBlobUrl(null);
+    }
+  }, [mediaBlob]);
 
   // Start camera preview when video type is selected (before recording)
   useEffect(() => {
@@ -220,13 +232,13 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
               <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
               {mediaBlob && !recording && (
-                <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />
+                {mediaBlobUrl && <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />}
               )}
             </div>
           )}
 
-          {responseType === 'audio' && mediaBlob && !recording && (
-            <AudioPlayer src={URL.createObjectURL(mediaBlob)} />
+          {responseType === 'audio' && mediaBlobUrl && !recording && (
+            <AudioPlayer src={mediaBlobUrl} />
           )}
 
           <div className="flex justify-center">
@@ -315,12 +327,24 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
   const [responseType, setResponseType] = useState(null);
   const [recording, setRecording] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
+  const [mediaBlobUrl, setMediaBlobUrl] = useState(null);
   const [textNote, setTextNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
   const chunksRef = useRef([]);
+
+  // Stable blob URL — prevents video flicker during re-renders
+  useEffect(() => {
+    if (mediaBlob) {
+      const url = URL.createObjectURL(mediaBlob);
+      setMediaBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setMediaBlobUrl(null);
+    }
+  }, [mediaBlob]);
 
   // Start camera preview when video type is selected (before recording)
   useEffect(() => {
@@ -429,11 +453,11 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
               <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
-              {mediaBlob && !recording && <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />}
+              {mediaBlob && !recording && mediaBlobUrl && <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />}
             </div>
           )}
-          {responseType === 'audio' && mediaBlob && !recording && (
-            <AudioPlayer src={URL.createObjectURL(mediaBlob)} />
+          {responseType === 'audio' && mediaBlobUrl && !recording && (
+            <AudioPlayer src={mediaBlobUrl} />
           )}
           <div className="flex justify-center">
             {!recording && !mediaBlob ? (

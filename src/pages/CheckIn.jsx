@@ -37,10 +37,22 @@ export default function CheckIn() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [mediaBlobUrl, setMediaBlobUrl] = useState(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
   const chunksRef = useRef([]);
+
+  // Stable blob URL — prevents video flicker during upload progress updates
+  useEffect(() => {
+    if (mediaBlob) {
+      const url = URL.createObjectURL(mediaBlob);
+      setMediaBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setMediaBlobUrl(null);
+    }
+  }, [mediaBlob]);
 
   // Load custom practices from user profile
   useEffect(() => {
@@ -272,15 +284,15 @@ export default function CheckIn() {
                 {mediaType === 'video' && (
                   <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
                     <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
-                    {mediaBlob && !recording && (
-                      <video src={URL.createObjectURL(mediaBlob)} className="absolute inset-0 w-full h-full object-cover" controls />
+                    {mediaBlobUrl && !recording && (
+                      <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />
                     )}
                   </div>
                 )}
                 
-                {mediaType === 'audio' && mediaBlob && !recording && (
+                {mediaType === 'audio' && mediaBlobUrl && !recording && (
                   <div className="bg-forest-800 rounded-xl p-4">
-                    <audio src={URL.createObjectURL(mediaBlob)} controls className="w-full" />
+                    <audio src={mediaBlobUrl} controls className="w-full" />
                   </div>
                 )}
 
