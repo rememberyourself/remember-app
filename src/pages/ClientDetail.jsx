@@ -622,6 +622,82 @@ function AIAnalysisDisplay({ analysis }) {
   );
 }
 
+function ConversationAnalysisDisplay({ analysis }) {
+  if (!analysis) return null;
+
+  return (
+    <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-gold-500/20">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-lg">💬</span>
+        <h4 className="text-gold-500 text-xs uppercase tracking-wider font-medium">Conversation Analysis</h4>
+        <span className="text-earth-700 text-[10px] ml-auto">
+          {analysis.replyCount} {analysis.replyCount === 1 ? 'reply' : 'replies'}
+        </span>
+      </div>
+
+      {/* Conversation Dynamic */}
+      {analysis.conversationDynamic && (
+        <div className="mb-3 bg-gold-500/10 rounded-lg px-3 py-2 border border-gold-500/20">
+          <span className="text-earth-500 text-[10px] uppercase tracking-wider">Dynamic</span>
+          <p className="text-warm-white text-sm mt-0.5">{analysis.conversationDynamic}</p>
+        </div>
+      )}
+
+      {/* Mood */}
+      {analysis.mood && (
+        <div className="mb-3">
+          <span className="text-earth-500 text-[10px] uppercase tracking-wider">Evolving Mood</span>
+          <p className="text-warm-white text-sm mt-0.5">{analysis.mood}</p>
+        </div>
+      )}
+
+      {/* Key Points */}
+      {analysis.keyPoints?.length > 0 && (
+        <div className="mb-3">
+          <span className="text-earth-500 text-[10px] uppercase tracking-wider">Key Themes</span>
+          <ul className="mt-1 space-y-1">
+            {analysis.keyPoints.map((point, i) => (
+              <li key={i} className="text-earth-300 text-sm flex items-start gap-2">
+                <span className="text-gold-500/70 mt-0.5 text-xs">•</span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Patterns */}
+      {analysis.patterns?.length > 0 && (
+        <div className="mb-3">
+          <span className="text-earth-500 text-[10px] uppercase tracking-wider">Emerging Patterns</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {analysis.patterns.map((p, i) => (
+              <span key={i} className="bg-gold-500/10 text-gold-400 text-xs px-2.5 py-1 rounded-full border border-gold-500/20">
+                {p}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Suggested Questions */}
+      {analysis.suggestedQuestions?.length > 0 && (
+        <div>
+          <span className="text-earth-500 text-[10px] uppercase tracking-wider">Next Questions</span>
+          <ul className="mt-1 space-y-1">
+            {analysis.suggestedQuestions.map((q, i) => (
+              <li key={i} className="text-earth-400 text-sm flex items-start gap-2">
+                <span className="text-gold-500/50 mt-0.5 text-xs">?</span>
+                <span className="italic">{q}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== Resources Tab Component =====
 function ResourcesTab({ clientId }) {
   const [resources, setResources] = useState([]);
@@ -985,6 +1061,9 @@ export default function ClientDetail() {
                     <div className="mt-4 pt-4 border-t border-forest-700/50 animate-fade-in">
                       {/* AI Analysis */}
                       <AIAnalysisDisplay analysis={c.aiAnalysis} />
+
+                      {/* Conversation Analysis (shows after replies exist) */}
+                      <ConversationAnalysisDisplay analysis={c.conversationAnalysis} />
 
                       {/* Coach Response Thread */}
                       {c.coachResponse ? (

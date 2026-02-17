@@ -77,6 +77,27 @@ async function sendTelegramNotification(userId, ratings, mediaType, date) {
   }
 }
 
+async function sendTelegramReplyNotification(checkinId, clientName, replyType, replyText) {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+
+    const preview = replyType === 'text'
+      ? (replyText?.substring(0, 100) || '(empty)')
+      : `🎥 ${replyType} message`;
+    const message = `💬 Reply from ${clientName}\n${preview}\n📎 Check-in: ${checkinId.substring(0, 8)}...`;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: '1379182535', text: message }),
+    });
+    console.log('📨 Telegram reply notification sent for', clientName);
+  } catch (err) {
+    console.error('❌ Telegram reply notification failed:', err.message);
+  }
+}
+
 // ===== AI ANALYSIS (async background) =====
 
 const COACHING_SYSTEM_PROMPT = `You are an experienced men's work coach analyzing a client's check-in. This is a context of masculine self-development — presence, vulnerability, authenticity, heart vs mind, shadow work, and personal responsibility.
@@ -189,6 +210,109 @@ async function processCheckinAnalysis(checkinId, mediaType, mediaPath, textNote)
   }
 }
 
+const CONVERSATION_ANALYSIS_PROMPT = `You are an experienced men's work coach analyzing a coaching conversation thread. This includes the original check-in and follow-up replies between coach and client.
+
+Analyze the FULL conversation and return a JSON object with:
+- "keyPoints" (array of strings): key themes and developments across the conversation
+- "patterns" (array of strings): patterns emerging through the dialogue (shifts, resistance, openings, breakthroughs)
+- "suggestedQuestions" (array of strings): next coaching questions based on how the conversation evolved
+- "mood" (string): the client's evolving emotional state through the conversation
+- "conversationDynamic" (string): a brief assessment of the coaching dynamic (e.g. "deepening trust", "surface-level", "breakthrough moment", "resistance softening")
+
+Look at how the client responds to coaching input. Notice shifts between replies. Frame patterns without judgment.
+
+Return ONLY valid JSON, no markdown fences.`;
+
+async function processConversationAnalysis(checkinId) {
+  try {
+    console.log(`🧠 Starting conversation analysis for check-in ${checkinId}`);
+
+    // Get the check-in with its transcript
+    const { rows: checkinRows } = await pool.query('SELECT * FROM checkins WHERE id = $1', [checkinId]);
+    if (checkinRows.length === 0) return;
+    const checkin = checkinRows[0];
+
+    // Get all replies
+    const { rows: replies } = await pool.query(
+      'SELECT * FROM replies WHERE checkin_id = $1 ORDER BY timestamp ASC', [checkinId]
+    );
+
+    if (replies.length < 1) return; // Need at least 1 reply to analyze conversation
+
+    // Build conversation text
+    let conversationText = '';
+
+    // Original check-in
+    const existingAnalysis = checkin.ai_analysis ? (typeof checkin.ai_analysis === 'string' ? JSON.parse(checkin.ai_analysis) : checkin.ai_analysis) : null;
+    const originalTranscript = existingAnalysis?.transcript || checkin.text_note || '(no text available)';
+    conversationText += `[CLIENT CHECK-IN]\n${originalTranscript}\n\n`;
+
+    // Coach response
+    if (checkin.coach_response) {
+      const cr = typeof checkin.coach_response === 'string' ? JSON.parse(checkin.coach_response) : checkin.coach_response;
+      if (cr.text) conversationText += `[COACH RESPONSE]\n${cr.text}\n\n`;
+    }
+
+    // Replies — transcribe media if needed
+    for (const reply of replies) {
+      const role = reply.from === 'client' ? 'CLIENT REPLY' : 'COACH REPLY';
+      let replyText = reply.text || '';
+
+      if ((reply.type === 'video' || reply.type === 'audio') && reply.media_path && !replyText) {
+        try {
+          const { data, error } = await supabase.storage.from('uploads').download(reply.media_path);
+          if (!error) {
+            const buf = Buffer.from(await data.arrayBuffer());
+            const ext = reply.media_path.split('.').pop() || 'webm';
+            replyText = await transcribeMedia(buf, ext);
+          }
+        } catch (e) {
+          console.log(`⚠️ Could not transcribe reply ${reply.id}:`, e.message);
+          replyText = `(${reply.type} message — transcription failed)`;
+        }
+      }
+
+      conversationText += `[${role}]\n${replyText || '(no text)'}\n\n`;
+    }
+
+    if (conversationText.trim().length < 20) {
+      console.log(`⏭️ Skipping conversation analysis — too little content`);
+      return;
+    }
+
+    // Analyze with Claude
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        system: CONVERSATION_ANALYSIS_PROMPT,
+        messages: [{ role: 'user', content: `Coaching conversation:\n\n${conversationText}` }],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`Anthropic API error ${resp.status}: ${await resp.text()}`);
+    const data = await resp.json();
+    const content = data.content?.[0]?.text || '';
+    const cleaned = content.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
+    const analysis = JSON.parse(cleaned);
+
+    // Store as conversation_analysis on the checkin
+    const convAnalysis = { ...analysis, replyCount: replies.length, timestamp: new Date().toISOString() };
+    await pool.query('UPDATE checkins SET conversation_analysis = $1 WHERE id = $2', [JSON.stringify(convAnalysis), checkinId]);
+    console.log(`✅ Conversation analysis saved for check-in ${checkinId} (${replies.length} replies)`);
+
+  } catch (err) {
+    console.error(`❌ Conversation analysis failed for ${checkinId}:`, err.message);
+  }
+}
+
 // ===== HELPER: format checkin row for API response =====
 function formatCheckin(row) {
   return {
@@ -201,6 +325,7 @@ function formatCheckin(row) {
     textNote: row.text_note || '',
     mediaPath: row.media_path,
     aiAnalysis: row.ai_analysis || null,
+    conversationAnalysis: row.conversation_analysis || null,
     coachResponse: row.coach_response || null,
     replies: row.replies || undefined,
     createdAt: row.created_at,
@@ -663,6 +788,16 @@ app.post('/api/checkins/:checkinId/reply', upload.single('media'), async (req, r
        VALUES ($1, $2, $3, $4, $5)`,
       [checkinId, from, type || 'text', replyMediaFilename, text || '']
     );
+
+    // Fire-and-forget: Telegram notification when CLIENT replies
+    if (from === 'client') {
+      const clientUser = await pool.query('SELECT name FROM users WHERE id = $1', [checkinRows[0].user_id]);
+      const clientName = clientUser.rows[0]?.name || 'Unknown';
+      sendTelegramReplyNotification(checkinId, clientName, type || 'text', text);
+    }
+
+    // Fire-and-forget: conversation analysis after each reply
+    processConversationAnalysis(checkinId);
 
     // Return full checkin with all replies
     const checkin = formatCheckin(checkinRows[0]);

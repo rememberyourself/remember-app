@@ -51,6 +51,13 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Add conversation_analysis column if not exists
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkins' AND column_name = 'conversation_analysis') THEN
+    ALTER TABLE checkins ADD COLUMN conversation_analysis JSONB;
+  END IF;
+END $$;
+
 -- Index for fast checkin lookups
 CREATE INDEX IF NOT EXISTS idx_checkins_user_id ON checkins(user_id);
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(date DESC);
