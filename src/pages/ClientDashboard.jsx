@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress } from '../utils/api';
+import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress, mediaUrl } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -108,12 +108,7 @@ function DashboardReplyForm({ checkinId, onSubmitted, onCancel }) {
         const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
         mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
-      const res = await fetch(`/api/checkins/${checkinId}/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'client', type: responseType, text: textNote || '', media_path: mediaPath }),
-      });
-      if (!res.ok) throw new Error('Failed');
+      await submitReply(checkinId, { from: 'client', type: responseType, text: textNote || '', mediaPath });
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
     finally { setSubmitting(false); setUploadProgress(0); }
@@ -286,14 +281,14 @@ export default function ClientDashboard() {
                 )}
                 {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'video' && (
                   <video 
-                    src={`/api/uploads/${latestResponse.coachResponse.mediaPath}#t=0.001`} 
+                    src={mediaUrl(latestResponse.coachResponse.mediaPath) + "#t=0.001"} 
                     controls 
                     preload="auto" 
                     className="w-full rounded-lg mt-2" 
                   />
                 )}
                 {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'audio' && (
-                  <AudioPlayer src={`/api/uploads/${latestResponse.coachResponse.mediaPath}`} className="mt-2" />
+                  <AudioPlayer src={mediaUrl(latestResponse.coachResponse.mediaPath)} className="mt-2" />
                 )}
               </div>
 
@@ -390,10 +385,10 @@ export default function ClientDashboard() {
                   <p className="text-earth-300 text-sm italic">"{lastCheckin.coachResponse.text}"</p>
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'video' && (
-                  <video src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}#t=0.001`} controls preload="auto" className="w-full rounded-lg mt-2" />
+                  <video src={mediaUrl(lastCheckin.coachResponse.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-2" />
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'audio' && (
-                  <AudioPlayer src={`/api/uploads/${lastCheckin.coachResponse.mediaPath}`} className="mt-2" />
+                  <AudioPlayer src={mediaUrl(lastCheckin.coachResponse.mediaPath)} className="mt-2" />
                 )}
               </div>
             )}

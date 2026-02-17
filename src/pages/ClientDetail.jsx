@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress } from '../utils/api';
+import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -17,8 +17,6 @@ function formatDate(dateStr, createdAt) {
 }
 import Avatar from '../components/Avatar';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-
-const API_BASE = '/api';
 
 const RATING_COLORS = {
   heart: '#ef4444',
@@ -60,8 +58,7 @@ const DEFAULT_PRACTICES = [
 ];
 
 function mediaUrl(mediaPath) {
-  if (!mediaPath) return null;
-  return `${API_BASE}/uploads/${mediaPath}`;
+  return getMediaUrl(mediaPath);
 }
 
 // ===== Coach Response Form Component =====
@@ -167,12 +164,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
         const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
         mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
-      const res = await fetch(`/api/checkins/${checkinId}/response`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: responseType, text: textNote || '', media_path: mediaPath }),
-      });
-      if (!res.ok) throw new Error('Failed');
+      await submitCoachResponse(checkinId, { type: responseType, text: textNote || '', mediaPath });
       onSubmitted();
     } catch {
       alert('Failed to submit response.');
@@ -408,12 +400,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
         const ext = mediaBlob.type?.includes('mp4') ? 'mp4' : 'webm';
         mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
-      const res = await fetch(`/api/checkins/${checkinId}/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'coach', type: responseType, text: textNote || '', media_path: mediaPath }),
-      });
-      if (!res.ok) throw new Error('Failed');
+      await submitReply(checkinId, { from: 'coach', type: responseType, text: textNote || '', mediaPath });
       onSubmitted();
     } catch { alert('Failed to send reply.'); }
     finally { setSubmitting(false); setUploadProgress(0); }
@@ -717,11 +704,7 @@ function ResourcesTab({ clientId }) {
     if (!title.trim() || !file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('title', title.trim());
-      formData.append('description', description.trim());
-      formData.append('file', file);
-      await uploadResource(clientId, formData);
+      await uploadResource(clientId, { title: title.trim(), description: description.trim(), file });
       setTitle(''); setDescription(''); setFile(null); setShowUpload(false);
       loadResources();
     } catch { alert('Failed to upload resource.'); }

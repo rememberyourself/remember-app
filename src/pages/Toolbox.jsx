@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { getResources } from '../utils/api';
+import { getResources, mediaUrl } from '../utils/api';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
-
-const API_BASE = '/api';
 
 export default function Toolbox() {
   const { user } = useAuth();
@@ -66,7 +64,7 @@ export default function Toolbox() {
 
                 {r.type === 'pdf' && (
                   <a
-                    href={`${API_BASE}/uploads/${r.filePath}`}
+                    href={mediaUrl(r.filePath)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 flex items-center justify-center gap-2 w-full py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl text-sm font-medium transition-all border border-gold-500/20 hover:border-gold-500/30"
@@ -76,7 +74,7 @@ export default function Toolbox() {
                 )}
                 {r.type === 'video' && (
                   <video
-                    src={`${API_BASE}/uploads/${r.filePath}#t=0.001`}
+                    src={mediaUrl(r.filePath) + '#t=0.001'}
                     controls
                     preload="auto"
                     className="w-full rounded-lg mt-3"
@@ -84,10 +82,10 @@ export default function Toolbox() {
                 )}
                 {r.type === 'image' && (
                   <img
-                    src={`${API_BASE}/uploads/${r.filePath}`}
+                    src={mediaUrl(r.filePath)}
                     alt={r.title}
                     className="w-full rounded-lg mt-3 cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(`${API_BASE}/uploads/${r.filePath}`, '_blank')}
+                    onClick={() => window.open(mediaUrl(r.filePath), '_blank')}
                   />
                 )}
               </div>

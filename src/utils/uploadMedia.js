@@ -1,9 +1,11 @@
-const API = '/api';
+import { supabase } from './supabase';
 
 /**
- * Upload media via the server (which forwards to Supabase Storage).
- * Uses XHR for reliable progress tracking on iOS Safari.
- * Server-side upload is more reliable than cross-origin signed URLs on mobile browsers.
+ * Upload media directly to Supabase Storage.
+ * 
+ * Note: Progress tracking doesn't work on iOS Safari for cross-origin uploads.
+ * We use a chunked approach: track upload start/complete as 0%/100%.
+ * For detailed progress, we'd need TUS protocol (future improvement).
  *
  * @param {Blob|File} file - The file/blob to upload
  * @param {string} extension - File extension (e.g. 'webm', 'mp4')
@@ -13,38 +15,30 @@ const API = '/api';
 export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   if (onProgress) onProgress(0);
 
-  const formData = new FormData();
-  formData.append('media', file, `recording.${extension}`);
+  const filename = `${crypto.randomUUID()}.${extension}`;
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API}/upload-media`);
+  // Determine content type
+  const mimeMap = {
+    webm: 'video/webm', mp4: 'video/mp4', m4a: 'audio/m4a',
+    ogg: 'audio/ogg', wav: 'audio/wav', mp3: 'audio/mpeg',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  };
+  const contentType = mimeMap[extension] || file.type || 'application/octet-stream';
 
-    xhr.upload.addEventListener('progress', (e) => {
-      if (onProgress) {
-        if (e.lengthComputable) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        } else if (file.size > 0) {
-          onProgress(Math.round((e.loaded / file.size) * 100));
-        }
-      }
+  // Show indeterminate progress
+  if (onProgress) onProgress(10);
+
+  const { error } = await supabase.storage
+    .from('uploads')
+    .upload(filename, file, {
+      contentType,
+      upsert: false,
     });
 
-    xhr.addEventListener('load', () => {
-      if (onProgress) onProgress(100);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          resolve(data.path);
-        } catch {
-          reject(new Error('Invalid response'));
-        }
-      } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
-      }
-    });
+  if (error) {
+    throw new Error(`Upload failed: ${error.message}`);
+  }
 
-    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-    xhr.send(formData);
-  });
+  if (onProgress) onProgress(100);
+  return filename;
 }

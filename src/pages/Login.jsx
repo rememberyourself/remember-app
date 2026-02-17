@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { login } from '../utils/api';
 import Footer from '../components/Footer';
 
 export default function Login() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { setUser } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -16,9 +15,8 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(code.trim());
-      setUser(user);
-      navigate(user.role === 'coach' ? '/coach' : '/dashboard');
+      await login(code.trim());
+      // Navigation happens via auth state change in useAuth
     } catch {
       setError('Invalid code. Please try again.');
     } finally {

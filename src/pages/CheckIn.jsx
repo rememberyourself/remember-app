@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createCheckin, addCustomPractice, getProfile } from '../utils/api';
+import { createCheckin as createCheckinApi, addCustomPractice, getProfile } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -177,21 +177,16 @@ export default function CheckIn() {
         mediaPath = await uploadMediaDirect(mediaBlob, ext, setUploadProgress);
       }
 
-      // Step 2: Send metadata to server (no media file, just the path)
-      const res = await fetch('/api/checkins', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          date: new Date().toISOString().split('T')[0],
-          ratings,
-          practices,
-          mediaType: mediaType || 'none',
-          textNote: textNote || '',
-          media_path: mediaPath,
-        }),
+      // Step 2: Create checkin via Supabase
+      await createCheckinApi({
+        userId: user.id,
+        date: new Date().toISOString().split('T')[0],
+        ratings,
+        practices,
+        mediaType: mediaType || 'none',
+        textNote: textNote || '',
+        mediaPath,
       });
-      if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
 
       setSubmitted(true);
       setTimeout(() => navigate('/dashboard'), 2000);
