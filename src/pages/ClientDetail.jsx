@@ -231,8 +231,8 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
           {responseType === 'video' && (
             <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
               <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
-              {mediaBlob && !recording && (
-                {mediaBlobUrl && <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />}
+              {mediaBlob && !recording && mediaBlobUrl && (
+                <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />
               )}
             </div>
           )}
