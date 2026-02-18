@@ -46,7 +46,7 @@ export default function Login() {
 
           {/* Login form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="animate-slide-up stagger-1 opacity-0">
+            <div className="animate-slide-up stagger-1">
               <label className="block text-earth-400 text-xs uppercase tracking-wider mb-2">
                 Your Code
               </label>
@@ -64,7 +64,7 @@ export default function Login() {
               <p className="text-red-400 text-sm text-center animate-fade-in">{error}</p>
             )}
 
-            <div className="animate-slide-up stagger-2 opacity-0">
+            <div className="animate-slide-up stagger-2">
               <button
                 type="submit"
                 disabled={loading || !code.trim()}
@@ -85,7 +85,7 @@ export default function Login() {
         </div>
       </div>
 
-      <div className="animate-slide-up stagger-3 opacity-0">
+      <div className="animate-slide-up stagger-3">
         <Footer />
       </div>
     </div>
