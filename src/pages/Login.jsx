@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Footer from '../components/Footer';
@@ -7,8 +7,15 @@ export default function Login() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect when user is set (after successful login or existing session)
+  useEffect(() => {
+    if (user) {
+      navigate(user.role === 'coach' ? '/coach' : '/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +23,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(code.trim());
-      // Navigation happens via auth state change in useAuth
+      // Navigation happens via useEffect when user state updates
     } catch {
       setError('Invalid code. Please try again.');
     } finally {
