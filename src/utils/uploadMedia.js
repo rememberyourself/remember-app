@@ -25,18 +25,35 @@ export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   };
   const contentType = mimeMap[extension] || file.type || 'application/octet-stream';
 
-  // Show indeterminate progress
-  if (onProgress) onProgress(10);
+  // Simulate progress since iOS Safari doesn't fire cross-origin progress events.
+  // Estimate upload time based on file size (~500KB/s on cellular, faster on wifi)
+  let fakeProgress = 5;
+  let fakeInterval = null;
+  if (onProgress) {
+    onProgress(5);
+    const estimatedMs = Math.max(3000, Math.min(60000, (file.size / 500000) * 1000));
+    const stepMs = 500;
+    const steps = estimatedMs / stepMs;
+    const increment = 85 / steps; // Go from 5% to 90%
+    fakeInterval = setInterval(() => {
+      fakeProgress = Math.min(90, fakeProgress + increment);
+      onProgress(Math.round(fakeProgress));
+    }, stepMs);
+  }
 
-  const { error } = await supabase.storage
-    .from('uploads')
-    .upload(filename, file, {
-      contentType,
-      upsert: false,
-    });
+  try {
+    const { error } = await supabase.storage
+      .from('uploads')
+      .upload(filename, file, {
+        contentType,
+        upsert: false,
+      });
 
-  if (error) {
-    throw new Error(`Upload failed: ${error.message}`);
+    if (error) {
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+  } finally {
+    if (fakeInterval) clearInterval(fakeInterval);
   }
 
   if (onProgress) onProgress(100);

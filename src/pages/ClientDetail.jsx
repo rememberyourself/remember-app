@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl } from '../utils/api';
+import VideoPlayer from '../components/VideoPlayer';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -305,7 +306,7 @@ function ThreadMessageCoach({ msg }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={mediaUrl(msg.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-2" />
+        <VideoPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
         <AudioPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
@@ -1109,7 +1110,7 @@ export default function ClientDetail() {
                   </div>
                   {c.textNote && <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>}
                   {c.mediaPath && c.mediaType === 'video' && (
-                    <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-3" />
+                    <VideoPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />
                   )}
                   {c.mediaPath && c.mediaType === 'audio' && (
                     <AudioPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />
@@ -1159,7 +1160,7 @@ export default function ClientDetail() {
           <div className="space-y-4 animate-fade-in">
             {client.checkins?.filter(c => c.mediaType === 'video' && c.mediaPath).map((c, i) => (
               <div key={i} className="bg-forest-800 rounded-xl overflow-hidden border border-forest-700/50">
-                <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full" />
+                <VideoPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} />
                 <div className="p-3">
                   <span className="text-earth-400 text-sm">{formatDate(c.date, c.createdAt)}</span>
                 </div>

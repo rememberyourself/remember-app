@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getCheckins, submitReply, uploadWithProgress, markSeen, mediaUrl } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
+import VideoPlayer from '../components/VideoPlayer';
 import Footer from '../components/Footer';
 import AudioPlayer from '../components/AudioPlayer';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -229,7 +230,7 @@ function ThreadMessage({ msg, isCoach }) {
       </div>
       {msg.text && <p className="text-earth-200 text-sm leading-relaxed">"{msg.text}"</p>}
       {msg.mediaPath && msg.type === 'video' && (
-        <video src={mediaUrl(msg.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-2" />
+        <VideoPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
       )}
       {msg.mediaPath && msg.type === 'audio' && (
         <AudioPlayer src={mediaUrl(msg.mediaPath) + "#t=0.001"} className="mt-2" />
@@ -373,7 +374,7 @@ export default function CheckInHistory() {
                   <p className="text-earth-400 text-sm mt-2 italic">"{c.textNote}"</p>
                 )}
                 {c.mediaPath && c.mediaType === 'video' && (
-                  <video src={mediaUrl(c.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-3" />
+                  <VideoPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />
                 )}
                 {c.mediaPath && c.mediaType === 'audio' && (
                   <AudioPlayer src={mediaUrl(c.mediaPath) + "#t=0.001"} className="mt-3" />

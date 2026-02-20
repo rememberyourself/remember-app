@@ -21,13 +21,25 @@ Be direct, compassionate, and perceptive. Look beneath the surface. Notice what'
 
 Return ONLY valid JSON, no markdown fences.`;
 
+const WHISPER_MAX_SIZE = 25 * 1024 * 1024; // 25MB
+
 async function transcribeMedia(fileBuffer, ext) {
   ext = ext || 'webm';
-  const mimeMap = { webm: 'video/webm', mp4: 'video/mp4', m4a: 'audio/m4a', ogg: 'audio/ogg', wav: 'audio/wav', mp3: 'audio/mpeg' };
-  const mime = mimeMap[ext] || 'application/octet-stream';
+  const audioMimeMap = { webm: 'audio/webm', mp4: 'audio/mp4', m4a: 'audio/m4a', ogg: 'audio/ogg', wav: 'audio/wav', mp3: 'audio/mpeg' };
+  // Always send as audio/* MIME type — Whisper only needs the audio track
+  const mime = audioMimeMap[ext] || 'audio/webm';
+
+  console.log(`🎤 File size: ${(fileBuffer.length / 1024 / 1024).toFixed(1)}MB, type: ${ext}`);
+
+  // If file is too large, try chunking: send first 24MB
+  let bufferToSend = fileBuffer;
+  if (fileBuffer.length > WHISPER_MAX_SIZE) {
+    console.log(`⚠️ File too large (${(fileBuffer.length / 1024 / 1024).toFixed(1)}MB), truncating to ${(WHISPER_MAX_SIZE / 1024 / 1024)}MB`);
+    bufferToSend = fileBuffer.slice(0, WHISPER_MAX_SIZE);
+  }
 
   const form = new FormData();
-  form.append('file', new Blob([fileBuffer], { type: mime }), `recording.${ext}`);
+  form.append('file', new Blob([bufferToSend], { type: mime }), `recording.${ext}`);
   form.append('model', 'whisper-1');
 
   const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -36,7 +48,26 @@ async function transcribeMedia(fileBuffer, ext) {
     body: form,
   });
 
-  if (!resp.ok) throw new Error(`Whisper API error ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) {
+    const errorText = await resp.text();
+    // If still too large even after truncation, try with even smaller chunk
+    if (resp.status === 413) {
+      console.log(`⚠️ Still too large after truncation, trying with 20MB...`);
+      const smallerBuffer = fileBuffer.slice(0, 20 * 1024 * 1024);
+      const form2 = new FormData();
+      form2.append('file', new Blob([smallerBuffer], { type: mime }), `recording.${ext}`);
+      form2.append('model', 'whisper-1');
+      const resp2 = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: form2,
+      });
+      if (!resp2.ok) throw new Error(`Whisper API error ${resp2.status}: ${await resp2.text()}`);
+      const text = (await resp2.json()).text;
+      return text + '\n[Note: Recording was truncated due to file size — last portion may be missing]';
+    }
+    throw new Error(`Whisper API error ${resp.status}: ${errorText}`);
+  }
   return (await resp.json()).text;
 }
 
@@ -154,10 +185,13 @@ export async function handler(event) {
     return { statusCode: 200, body: JSON.stringify({ status: 'done', checkinId }) };
   } catch (err) {
     console.error(`❌ process-checkin error:`, err.message, err.stack);
-    await supabase.from('checkins')
-      .update({ ai_analysis: { status: 'error', error: err.message, timestamp: new Date().toISOString() } })
-      .eq('id', checkinId)
-      .catch((e) => console.error('❌ Failed to save error state:', e.message));
+    try {
+      await supabase.from('checkins')
+        .update({ ai_analysis: { status: 'error', error: err.message, timestamp: new Date().toISOString() } })
+        .eq('id', checkinId);
+    } catch (e) {
+      console.error('❌ Failed to save error state:', e.message);
+    }
     return { statusCode: 200, body: JSON.stringify({ status: 'error', error: err.message }) };
   }
 }

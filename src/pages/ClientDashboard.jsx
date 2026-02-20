@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress, mediaUrl, markResponsesSeen } from '../utils/api';
+import VideoPlayer from '../components/VideoPlayer';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -288,11 +289,9 @@ export default function ClientDashboard() {
                   <p className="text-earth-200 text-sm leading-relaxed">"{latestResponse.coachResponse.text}"</p>
                 )}
                 {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'video' && (
-                  <video 
+                  <VideoPlayer 
                     src={mediaUrl(latestResponse.coachResponse.mediaPath) + "#t=0.001"} 
-                    controls 
-                    preload="auto" 
-                    className="w-full rounded-lg mt-2" 
+                    className="mt-2" 
                   />
                 )}
                 {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'audio' && (
