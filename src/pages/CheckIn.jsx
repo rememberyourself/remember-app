@@ -21,6 +21,18 @@ const DEFAULT_PRACTICES = [
   { key: 'nature', label: 'Nature', icon: '/icons/nature.png' },
 ];
 
+// Detect iOS version — getUserMedia video is broken in PWA standalone mode on iOS < 16
+function getIOSVersion() {
+  const match = navigator.userAgent.match(/OS (\d+)_/);
+  return match ? parseInt(match[1], 10) : null;
+}
+const isOldiOS = (() => {
+  const v = getIOSVersion();
+  return v !== null && v < 16;
+})();
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+const needsNativeCamera = isOldiOS && isStandalone;
+
 export default function CheckIn() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
@@ -28,6 +40,7 @@ export default function CheckIn() {
   const [mediaType, setMediaType] = useState(null);
   const [recording, setRecording] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
+  const nativeVideoRef = useRef(null);
   const [textNote, setTextNote] = useState('');
   const [ratings, setRatings] = useState({ heart: 5, mind: 5, presence: 5, energy: 5, connection: 5 });
   const [practices, setPractices] = useState({ meditation: false, breathwork: false, exercise: false, nature: false });
@@ -94,7 +107,9 @@ export default function CheckIn() {
   ];
 
   // Start camera preview when video type is selected (before recording)
+  // Skip on old iOS where getUserMedia is broken in PWA standalone
   useEffect(() => {
+    if (needsNativeCamera) return;
     if (mediaType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
       
@@ -301,7 +316,30 @@ export default function CheckIn() {
               </div>
             ) : (
               <div className="space-y-4">
-                {mediaType === 'video' && (
+                {mediaType === 'video' && needsNativeCamera && !mediaBlob && (
+                  <div className="space-y-3">
+                    <p className="text-earth-400 text-xs text-center">Tap to record with your camera</p>
+                    <label className="block w-full py-4 bg-forest-800 text-earth-200 rounded-xl text-center cursor-pointer hover:bg-forest-700 transition-colors border border-forest-600/30">
+                      <span className="text-lg">📹</span> Record Video
+                      <input
+                        ref={nativeVideoRef}
+                        type="file"
+                        accept="video/*"
+                        capture="user"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setMediaBlob(file);
+                            setMediaBlobUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {mediaType === 'video' && !needsNativeCamera && (
                   <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
                     <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline autoPlay />
                     {mediaBlobUrl && !recording && (
@@ -310,6 +348,12 @@ export default function CheckIn() {
                   </div>
                 )}
                 
+                {mediaType === 'video' && needsNativeCamera && mediaBlobUrl && (
+                  <div className="relative rounded-xl overflow-hidden bg-black">
+                    <video src={mediaBlobUrl} className="w-full rounded-xl" controls playsInline />
+                  </div>
+                )}
+
                 {mediaType === 'audio' && mediaBlobUrl && !recording && (
                   <div className="bg-forest-800 rounded-xl p-4">
                     <audio src={mediaBlobUrl} controls className="w-full" />
@@ -317,7 +361,22 @@ export default function CheckIn() {
                 )}
 
                 <div className="flex justify-center">
-                  {!recording && !mediaBlob ? (
+                  {needsNativeCamera && mediaType === 'video' ? (
+                    mediaBlob && (
+                      <div className="space-y-3 w-full">
+                        <div className="flex gap-3">
+                          <button onClick={() => { setMediaBlob(null); setMediaBlobUrl(null); if (nativeVideoRef.current) nativeVideoRef.current.value = ''; }}
+                            className="flex-1 py-3 bg-forest-800 text-earth-400 rounded-xl hover:bg-forest-700 transition-colors">
+                            🔄 Re-record
+                          </button>
+                          <button onClick={() => setStep(1)}
+                            className="flex-1 py-3 bg-gold-500 text-forest-900 font-medium rounded-xl hover:bg-gold-400 transition-colors">
+                            Continue →
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  ) : !recording && !mediaBlob ? (
                     <button
                       onClick={() => startRecording(mediaType)}
                       className="w-20 h-20 rounded-full bg-red-500/80 hover:bg-red-500 border-4 border-red-400/30 flex items-center justify-center transition-all hover:scale-105"
