@@ -34,7 +34,7 @@ export async function getCheckins(userId) {
     .from('checkins')
     .select('*')
     .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
   // Fetch replies for all checkins
@@ -105,7 +105,7 @@ export async function getClients() {
       .from('checkins')
       .select('date, coach_response')
       .eq('user_id', u.id)
-      .order('date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     const unrespondedCount = (userCheckins || []).filter(c => !c.coach_response).length;
 
@@ -146,7 +146,7 @@ export async function getClientDetail(userId) {
     .from('checkins')
     .select('*')
     .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .order('created_at', { ascending: false });
 
   // Fetch replies
   const checkinIds = (checkinRows || []).map(r => r.id);
