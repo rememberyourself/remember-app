@@ -206,13 +206,7 @@ export default function ClientDashboard() {
       setLatestResponse(data);
       const isNew = data?.hasNewResponse || false;
       setHasNewResponse(isNew);
-      // Mark as seen after viewing (with small delay so user sees the "new" indicator)
-      if (isNew) {
-        setTimeout(() => {
-          markResponsesSeen(user.id);
-          setHasNewResponse(false);
-        }, 3000);
-      }
+      // Don't auto-clear — let user dismiss by tapping the response
     }).catch(() => {});
     getCheckins(user.id).then(data => {
       setCheckins(data);
@@ -258,7 +252,12 @@ export default function ClientDashboard() {
 
         {/* Latest Coach Response — prominent card */}
         {latestResponse?.coachResponse && (
-          <div className="animate-slide-up stagger-1 opacity-0 mb-6">
+          <div className="animate-slide-up stagger-1 opacity-0 mb-6" onClick={() => {
+            if (hasNewResponse) {
+              markResponsesSeen(user.id);
+              setHasNewResponse(false);
+            }
+          }}>
             <div className="bg-forest-800 rounded-2xl p-5 border-2 border-gold-500/30 relative overflow-hidden">
               {/* Gold accent bar */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold-500/60 via-gold-500 to-gold-500/60" />

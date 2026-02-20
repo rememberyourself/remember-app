@@ -30,12 +30,16 @@ function BadgeUpdater() {
     const updateBadge = async () => {
       try {
         const count = await getUnreadResponseCount(user.id);
+        console.log(`[Badge] Unread count: ${count}, setAppBadge available: ${'setAppBadge' in navigator}`);
         if (count > 0) {
-          navigator.setAppBadge(count);
+          await navigator.setAppBadge(count);
+          console.log(`[Badge] Set badge to ${count}`);
         } else {
-          navigator.clearAppBadge();
+          await navigator.clearAppBadge();
         }
-      } catch {}
+      } catch (e) {
+        console.log(`[Badge] Error:`, e.message);
+      }
     };
 
     // Check immediately

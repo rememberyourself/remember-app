@@ -97,35 +97,60 @@ export default function CheckIn() {
   useEffect(() => {
     if (mediaType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
-        .then(stream => {
+      
+      const startPreview = async () => {
+        try {
+          // Try with ideal constraints first
+          let stream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+              audio: false 
+            });
+          } catch {
+            // Fallback: simplest possible constraints (fixes some iOS devices)
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          }
+          
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
           streamRef.current = stream;
           if (videoPreviewRef.current) {
             videoPreviewRef.current.srcObject = stream;
+            // iOS needs a small delay before play() sometimes
+            await new Promise(r => setTimeout(r, 100));
             videoPreviewRef.current.play().catch(() => {});
           }
-        })
-        .catch(() => {});
+        } catch {}
+      };
+      
+      startPreview();
       return () => {
         cancelled = true;
-        // Don't stop stream here — startRecording will reuse or replace it
       };
     }
   }, [mediaType, mediaBlob, recording]);
 
   const startRecording = useCallback(async (type) => {
     try {
-      const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
-        : { audio: true };
-
       // Stop preview-only stream before getting full stream with audio
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      let stream;
+      if (type === 'video') {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+            audio: true 
+          });
+        } catch {
+          // Fallback for iOS: simplest constraints
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       streamRef.current = stream;
       
       if (type === 'video' && videoPreviewRef.current) {
@@ -278,7 +303,7 @@ export default function CheckIn() {
               <div className="space-y-4">
                 {mediaType === 'video' && (
                   <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-                    <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline />
+                    <video ref={videoPreviewRef} className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} muted playsInline autoPlay />
                     {mediaBlobUrl && !recording && (
                       <video src={mediaBlobUrl} className="absolute inset-0 w-full h-full object-cover" controls />
                     )}
