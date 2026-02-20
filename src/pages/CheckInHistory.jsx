@@ -66,7 +66,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
   useEffect(() => {
     if (responseType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
         .then(stream => {
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
           streamRef.current = stream;
@@ -83,7 +83,7 @@ function ClientReplyForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;

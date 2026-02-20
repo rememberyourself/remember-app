@@ -1,21 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 /**
- * VideoPlayer — Lazy loading with blob download for smooth iOS playback.
+ * VideoPlayer — Lazy loading with thumbnail preview + blob download.
  * 
- * Shows a play button overlay. Only downloads when user taps play.
- * Downloads full video → blob URL → plays from local memory.
- * This avoids loading all videos on page load.
+ * Idle: Shows video thumbnail (preload=metadata + #t=0.001) with play button overlay.
+ * On tap: Downloads full video → blob URL → smooth playback from memory.
  */
 export default function VideoPlayer({ src, className = '', ...props }) {
   const videoRef = useRef(null);
   const [state, setState] = useState('idle'); // idle | downloading | ready | error
   const [blobUrl, setBlobUrl] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(null);
   const cancelRef = useRef(false);
 
-  // Clean up blob URL on src change or unmount
+  // Clean up blob URL on unmount
   useEffect(() => {
     return () => {
       cancelRef.current = true;
@@ -29,7 +27,6 @@ export default function VideoPlayer({ src, className = '', ...props }) {
   useEffect(() => {
     setState('idle');
     setProgress(0);
-    setDuration(null);
     cancelRef.current = false;
     if (blobUrl && blobUrl.startsWith('blob:')) {
       URL.revokeObjectURL(blobUrl);
@@ -92,53 +89,56 @@ export default function VideoPlayer({ src, className = '', ...props }) {
     }
   }, [src, state]);
 
-  const handleLoadedMetadata = () => {
-    if (videoRef.current && videoRef.current.duration && isFinite(videoRef.current.duration)) {
-      setDuration(videoRef.current.duration);
-    }
-  };
-
-  const handleDurationChange = () => {
-    if (videoRef.current && videoRef.current.duration && isFinite(videoRef.current.duration)) {
-      setDuration(videoRef.current.duration);
-    }
-  };
-
-  const formatDuration = (secs) => {
-    if (!secs || !isFinite(secs)) return '';
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  // Thumbnail URL: original source with #t=0.001 for first frame
+  const thumbnailSrc = src ? src.split('#')[0] + '#t=0.001' : '';
 
   return (
     <div className={`relative rounded-lg overflow-hidden bg-forest-800 ${className}`}>
-      {/* Idle state: play button overlay */}
+      {/* Idle state: thumbnail with play button overlay */}
       {state === 'idle' && (
-        <button
-          onClick={handlePlay}
-          className="w-full aspect-video flex flex-col items-center justify-center gap-2 bg-forest-800 hover:bg-forest-700 transition-colors"
-        >
-          <div className="w-14 h-14 rounded-full bg-gold-500/20 border-2 border-gold-500/50 flex items-center justify-center">
-            <svg className="w-7 h-7 text-gold-500 ml-1" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-          <span className="text-earth-400 text-xs">Tap to load video</span>
-        </button>
+        <div className="relative">
+          <video
+            src={thumbnailSrc}
+            preload="metadata"
+            playsInline
+            muted
+            className="w-full rounded-lg opacity-70"
+            style={{ transform: 'translateZ(0)' }}
+          />
+          <button
+            onClick={handlePlay}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+          >
+            <div className="w-14 h-14 rounded-full bg-black/40 border-2 border-white/60 flex items-center justify-center backdrop-blur-sm">
+              <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </button>
+        </div>
       )}
 
-      {/* Downloading state: progress */}
+      {/* Downloading state: progress overlay on thumbnail */}
       {state === 'downloading' && (
-        <div className="w-full aspect-video flex flex-col items-center justify-center gap-3 bg-forest-800">
-          <div className="w-10 h-10 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-earth-300 text-xs">{progress}%</span>
-            <div className="w-24 h-1 bg-forest-700 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gold-500 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
+        <div className="relative">
+          <video
+            src={thumbnailSrc}
+            preload="metadata"
+            playsInline
+            muted
+            className="w-full rounded-lg opacity-30"
+            style={{ transform: 'translateZ(0)' }}
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-earth-300 text-xs">{progress}%</span>
+              <div className="w-24 h-1 bg-forest-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gold-500 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -152,15 +152,13 @@ export default function VideoPlayer({ src, className = '', ...props }) {
       )}
 
       {/* Video element — only rendered when ready */}
-      {(state === 'ready') && (
+      {state === 'ready' && (
         <video
           ref={videoRef}
           src={blobUrl || undefined}
           controls
           playsInline
           preload="auto"
-          onLoadedMetadata={handleLoadedMetadata}
-          onDurationChange={handleDurationChange}
           onError={() => setState('error')}
           className="w-full rounded-lg"
           style={{ transform: 'translateZ(0)' }}

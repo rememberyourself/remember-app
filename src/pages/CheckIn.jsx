@@ -119,7 +119,7 @@ export default function CheckIn() {
           let stream;
           try {
             stream = await navigator.mediaDevices.getUserMedia({ 
-              video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+              video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
               audio: false 
             });
           } catch {
@@ -156,7 +156,7 @@ export default function CheckIn() {
       if (type === 'video') {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
             audio: true 
           });
         } catch {
