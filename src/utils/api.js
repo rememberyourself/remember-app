@@ -447,6 +447,17 @@ export function markResponsesSeen(clientId) {
   }
 }
 
+// Get count of check-ins without coach response (for coach badge)
+export async function getUnreviewedCheckinCount() {
+  const { data: checkins, error } = await supabase
+    .from('checkins')
+    .select('id, coach_response')
+    .is('coach_response', null);
+
+  if (error || !checkins) return 0;
+  return checkins.length;
+}
+
 // ===== PUSH NOTIFICATIONS =====
 
 export async function subscribeToPush(userId, subscription) {

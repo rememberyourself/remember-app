@@ -9,7 +9,7 @@ import CoachDashboard from './pages/CoachDashboard';
 import ClientDetail from './pages/ClientDetail';
 import Profile from './pages/Profile';
 import Toolbox from './pages/Toolbox';
-import { getUnreadResponseCount, subscribeToPush } from './utils/api';
+import { getUnreadResponseCount, getUnreviewedCheckinCount, subscribeToPush } from './utils/api';
 
 function ProtectedRoute({ children, role }) {
   const { user, loading } = useAuth();
@@ -53,21 +53,25 @@ function PushSetup() {
   return null;
 }
 
-// Badge updater for client PWA
+// Badge updater for both client and coach PWA
 function BadgeUpdater() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user || user.role !== 'client') return;
+    if (!user) return;
     if (!('setAppBadge' in navigator)) return;
 
     const updateBadge = async () => {
       try {
-        const count = await getUnreadResponseCount(user.id);
-        console.log(`[Badge] Unread count: ${count}, setAppBadge available: ${'setAppBadge' in navigator}`);
+        let count = 0;
+        if (user.role === 'client') {
+          count = await getUnreadResponseCount(user.id);
+        } else if (user.role === 'coach') {
+          count = await getUnreviewedCheckinCount();
+        }
+        console.log(`[Badge] ${user.role} unread count: ${count}`);
         if (count > 0) {
           await navigator.setAppBadge(count);
-          console.log(`[Badge] Set badge to ${count}`);
         } else {
           await navigator.clearAppBadge();
         }

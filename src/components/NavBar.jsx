@@ -54,14 +54,14 @@ export default function NavBar() {
       </header>
 
       {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-forest-900/90 backdrop-blur-xl border-t border-forest-700/50 pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-forest-900 border-t border-forest-700/50 pb-[env(safe-area-inset-bottom)]" style={{ transform: 'translateZ(0)' }}>
         <div className="max-w-lg mx-auto flex items-center justify-around py-2">
           {links.map(link => (
             <button
               key={link.path}
               onClick={() => navigate(link.path)}
               className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${
-                location.pathname === link.path
+                location.pathname === link.path || location.pathname.startsWith(link.path + '/')
                   ? 'text-gold-500'
                   : 'text-earth-600 hover:text-earth-400'
               }`}
