@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remember-v4';
+const CACHE_NAME = 'remember-v5';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -32,32 +32,39 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle push notifications (for future use)
+// Handle push notifications
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
+  // Use unique tag based on content to avoid collapsing different notifications
+  const tag = data.title?.includes('check-in') ? 'new-checkin-' + Date.now()
+    : data.title?.includes('Reply') ? 'client-reply-' + Date.now()
+    : 'coach-response-' + Date.now();
   event.waitUntil(
     self.registration.showNotification(data.title || 'Remember', {
-      body: data.body || 'You have a new message from your coach',
+      body: data.body || 'You have a new notification',
       icon: '/app-icon-192.png',
       badge: '/app-icon-192.png',
-      tag: 'coach-response',
-      data: { url: '/dashboard' },
+      tag,
+      data: { url: data.url || '/dashboard' },
     })
   );
 });
 
-// Handle notification click
+// Handle notification click — navigate to the correct page
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const targetPath = event.notification.data?.url || '/';
+  const targetUrl = new URL(targetPath, self.location.origin).href;
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(windowClients => {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // Try to focus an existing window and navigate it
       for (const client of windowClients) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(targetUrl);
           return client.focus();
         }
       }
-      return clients.openWindow(url);
+      return clients.openWindow(targetUrl);
     })
   );
 });

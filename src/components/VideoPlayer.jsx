@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 
 /**
- * VideoPlayer with preload buffering for iOS Safari.
- * Shows a loading spinner until the video has buffered enough to play smoothly.
+ * VideoPlayer — simplified for iOS Safari compatibility.
+ * Shows loading spinner, waits for sufficient buffer, then reveals.
+ * Falls back after timeout to avoid infinite spinner on iOS.
  */
 export default function VideoPlayer({ src, className = '', ...props }) {
   const videoRef = useRef(null);
@@ -12,16 +13,12 @@ export default function VideoPlayer({ src, className = '', ...props }) {
   useEffect(() => {
     setReady(false);
     setError(false);
+
+    // Fallback: show video after 4s even if canplaythrough hasn't fired
+    // iOS Safari sometimes never fires canplaythrough for streaming sources
+    const timeout = setTimeout(() => setReady(true), 4000);
+    return () => clearTimeout(timeout);
   }, [src]);
-
-  const handleCanPlay = () => {
-    setReady(true);
-  };
-
-  const handleError = () => {
-    setError(true);
-    setReady(true); // Show whatever we have
-  };
 
   return (
     <div className={`relative ${className}`}>
@@ -42,12 +39,12 @@ export default function VideoPlayer({ src, className = '', ...props }) {
         ref={videoRef}
         src={src}
         controls
-        preload="auto"
+        preload="metadata"
         playsInline
-        onCanPlayThrough={handleCanPlay}
-        onCanPlay={handleCanPlay}
-        onError={handleError}
-        className={`w-full rounded-lg ${ready ? 'opacity-100' : 'opacity-30'} transition-opacity duration-300`}
+        onCanPlayThrough={() => setReady(true)}
+        onError={() => { setError(true); setReady(true); }}
+        className={`w-full rounded-lg ${ready ? 'opacity-100' : 'opacity-30'}`}
+        style={{ transform: 'translateZ(0)' }}
         {...props}
       />
     </div>
