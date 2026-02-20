@@ -76,12 +76,12 @@ export default function Profile() {
     <div className="min-h-dvh bg-forest-900 pb-36 pt-16 pwa-safe-top">
       <NavBar />
       <div className="max-w-lg mx-auto px-4 py-6">
-        {/* Back button */}
-        <button onClick={() => navigate(-1)} className="text-earth-500 hover:text-warm-white transition-colors mb-6 flex items-center gap-2">
+        {/* Back button — navigate to role-specific home (more reliable than history back) */}
+        <button onClick={() => navigate(user?.role === 'coach' ? '/coach' : '/dashboard')} className="text-earth-500 hover:text-warm-white transition-colors mb-6 flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <span className="text-sm">Back</span>
+          <span className="text-sm">{user?.role === 'coach' ? 'Back to Clients' : 'Back'}</span>
         </button>
 
         {/* Profile Header */}

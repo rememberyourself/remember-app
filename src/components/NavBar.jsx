@@ -27,7 +27,7 @@ export default function NavBar() {
   return (
     <>
       {/* Top bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-forest-900 border-b border-forest-700/50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', transform: 'translateZ(0)' }}>
+      <header className="fixed top-0 left-0 right-0 z-[100] bg-forest-900 border-b border-forest-700/50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', transform: 'translateZ(0)' }}>
         <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <img src="/app-icon.png" alt="Remember" className="w-14 h-14 rounded-full" />
@@ -54,12 +54,19 @@ export default function NavBar() {
       </header>
 
       {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-forest-900 border-t border-forest-700/50 pb-[env(safe-area-inset-bottom)]" style={{ transform: 'translateZ(0)' }}>
-        <div className="max-w-lg mx-auto flex items-center justify-around py-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-forest-900 border-t border-forest-700/50 pb-[env(safe-area-inset-bottom)]" style={{ transform: 'translateZ(0)', WebkitTapHighlightColor: 'transparent' }}>
+        <div className="max-w-lg mx-auto flex items-center justify-around py-2" style={{ pointerEvents: 'auto' }}>
           {links.map(link => (
             <button
               key={link.path}
-              onClick={() => navigate(link.path)}
+              onClick={() => {
+                // Force navigation even if React Router is stuck
+                if (location.pathname !== link.path) {
+                  navigate(link.path);
+                } else {
+                  navigate(0); // Refresh current route
+                }
+              }}
               className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${
                 location.pathname === link.path || location.pathname.startsWith(link.path + '/')
                   ? 'text-gold-500'
