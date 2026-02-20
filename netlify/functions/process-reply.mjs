@@ -45,21 +45,44 @@ export async function handler(event) {
   }
 
   try {
-    // 1. Telegram notification when client replies
+    // 1. Telegram + Push notification when client replies
     if (replyFrom === 'client') {
+      const { data: checkin } = await supabase.from('checkins').select('user_id').eq('id', checkinId).single();
+      const { data: user } = await supabase.from('users').select('name').eq('id', checkin?.user_id).single();
+      const clientName = user?.name || 'Unknown';
+      const preview = replyType === 'text' ? (replyText?.substring(0, 100) || '(empty)') : `🎥 ${replyType} message`;
+
+      // Telegram notification
       const token = process.env.TELEGRAM_BOT_TOKEN;
       if (token) {
-        const { data: checkin } = await supabase.from('checkins').select('user_id').eq('id', checkinId).single();
-        const { data: user } = await supabase.from('users').select('name').eq('id', checkin?.user_id).single();
-        const clientName = user?.name || 'Unknown';
-        const preview = replyType === 'text' ? (replyText?.substring(0, 100) || '(empty)') : `🎥 ${replyType} message`;
         const message = `💬 Reply from ${clientName}\n${preview}\n📎 Check-in: ${checkinId.substring(0, 8)}...`;
-
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: '1379182535', text: message }),
         }).catch(() => {});
+      }
+
+      // Push notification to coaches
+      try {
+        const { data: coaches } = await supabase.from('users').select('id').eq('role', 'coach');
+        if (coaches?.length) {
+          const siteUrl = process.env.URL || 'https://rememberyourself-app.netlify.app';
+          for (const coach of coaches) {
+            await fetch(`${siteUrl}/api/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: coach.id,
+                title: `💬 Reply from ${clientName}`,
+                body: preview,
+                url: '/coach',
+              }),
+            }).catch(e => console.error(`⚠️ Coach push failed:`, e.message));
+          }
+        }
+      } catch (e) {
+        console.error(`⚠️ Coach push error:`, e.message);
       }
     }
 

@@ -169,9 +169,10 @@ export async function handler(event) {
 
     // Send Telegram notification
     const token = process.env.TELEGRAM_BOT_TOKEN;
+    const { data: clientUser } = await supabase.from('users').select('name').eq('id', checkin.user_id).single();
+    const clientName = clientUser?.name || 'Unknown';
+
     if (token) {
-      const { data: user } = await supabase.from('users').select('name').eq('id', checkin.user_id).single();
-      const clientName = user?.name || 'Unknown';
       const r = checkin.ratings || {};
       const message = `🔔 New Check-in from ${clientName}\n📊 Heart: ${r.heart || '-'} | Mind: ${r.mind || '-'} | Presence: ${r.presence || '-'} | Energy: ${r.energy || '-'} | Connection: ${r.connection || '-'}\n🎥 Type: ${mediaType || 'none'}\n📅 ${checkin.date || new Date().toISOString().split('T')[0]}`;
 
@@ -180,6 +181,36 @@ export async function handler(event) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: '1379182535', text: message }),
       }).catch(() => {});
+    }
+
+    // Send push notification to all coaches
+    try {
+      const { data: coaches } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'coach');
+
+      if (coaches?.length) {
+        const siteUrl = process.env.URL || 'https://rememberyourself-app.netlify.app';
+        const r = checkin.ratings || {};
+        const pushBody = `📊 Heart: ${r.heart || '-'} | Mind: ${r.mind || '-'} | Presence: ${r.presence || '-'}\n🎥 ${mediaType || 'text'}`;
+
+        for (const coach of coaches) {
+          await fetch(`${siteUrl}/api/send-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: coach.id,
+              title: `🔔 New check-in from ${clientName}`,
+              body: pushBody,
+              url: '/coach',
+            }),
+          }).catch(e => console.error(`⚠️ Coach push failed:`, e.message));
+        }
+        console.log(`📱 Coach push sent to ${coaches.length} coach(es)`);
+      }
+    } catch (e) {
+      console.error(`⚠️ Coach push error:`, e.message);
     }
 
     return { statusCode: 200, body: JSON.stringify({ status: 'done', checkinId }) };

@@ -19,22 +19,19 @@ function ProtectedRoute({ children, role }) {
   return children;
 }
 
-// Badge updater for client PWA
-function BadgeUpdater() {
+// Push notification setup for ALL users (clients + coaches)
+function PushSetup() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user || user.role !== 'client') return;
-    if (!('setAppBadge' in navigator)) return;
+    if (!user) return;
 
-    // Request push notification permission and subscribe
     const setupPush = async () => {
       try {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
         const reg = await navigator.serviceWorker.ready;
         const existing = await reg.pushManager.getSubscription();
         if (existing) {
-          // Already subscribed, ensure server knows
           await subscribeToPush(user.id, existing.toJSON());
           return;
         }
@@ -45,12 +42,24 @@ function BadgeUpdater() {
           applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
         });
         await subscribeToPush(user.id, sub.toJSON());
-        console.log('[Push] Subscribed successfully');
+        console.log(`[Push] Subscribed successfully (${user.role})`);
       } catch (e) {
         console.log('[Push] Setup failed:', e.message);
       }
     };
     setupPush();
+  }, [user]);
+
+  return null;
+}
+
+// Badge updater for client PWA
+function BadgeUpdater() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user || user.role !== 'client') return;
+    if (!('setAppBadge' in navigator)) return;
 
     const updateBadge = async () => {
       try {
@@ -67,13 +76,9 @@ function BadgeUpdater() {
       }
     };
 
-    // Check immediately
     updateBadge();
-
-    // Poll every 60 seconds
     const interval = setInterval(updateBadge, 60000);
 
-    // Also check on visibility change (when app comes to foreground)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') updateBadge();
     };
@@ -128,6 +133,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <PushSetup />
       <BadgeUpdater />
       <div className="min-h-dvh bg-forest-900">
         <AppRoutes />
