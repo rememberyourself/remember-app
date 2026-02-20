@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress, mediaUrl } from '../utils/api';
+import { getCheckins, getProfile, getLatestCoachResponse, submitReply, uploadWithProgress, mediaUrl, markResponsesSeen } from '../utils/api';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -203,7 +203,15 @@ export default function ClientDashboard() {
     getProfile(user.id).then(p => setCustomPractices(p.customPractices || [])).catch(() => {});
     getLatestCoachResponse(user.id).then(data => {
       setLatestResponse(data);
-      setHasNewResponse(data?.hasNewResponse || false);
+      const isNew = data?.hasNewResponse || false;
+      setHasNewResponse(isNew);
+      // Mark as seen after viewing (with small delay so user sees the "new" indicator)
+      if (isNew) {
+        setTimeout(() => {
+          markResponsesSeen(user.id);
+          setHasNewResponse(false);
+        }, 3000);
+      }
     }).catch(() => {});
     getCheckins(user.id).then(data => {
       setCheckins(data);

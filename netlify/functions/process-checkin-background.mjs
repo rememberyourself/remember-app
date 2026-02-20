@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const COACHING_SYSTEM_PROMPT = `You are an experienced men's work coach analyzing a client's check-in. This is a context of masculine self-development — presence, vulnerability, authenticity, heart vs mind, shadow work, and personal responsibility.
 
@@ -70,15 +74,26 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'checkinId required' }) };
   }
 
-  // Start processing (Netlify background functions would be ideal, but this works for now)
   try {
     console.log(`🧠 Processing check-in ${checkinId}`);
+    console.log(`📋 Config: SUPABASE_URL=${SUPABASE_URL ? 'SET' : 'MISSING'}, ANTHROPIC_KEY=${process.env.ANTHROPIC_API_KEY ? 'SET' : 'MISSING'}, OPENAI_KEY=${process.env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
+
+    // Mark as processing
+    await supabase.from('checkins')
+      .update({ ai_analysis: { status: 'processing', timestamp: new Date().toISOString() } })
+      .eq('id', checkinId);
 
     const { data: checkin, error } = await supabase
       .from('checkins').select('*').eq('id', checkinId).single();
-    if (error || !checkin) {
+    if (error) {
+      console.error(`❌ Supabase fetch error:`, error.message);
+      return { statusCode: 200, body: JSON.stringify({ status: 'db error', error: error.message }) };
+    }
+    if (!checkin) {
+      console.error(`❌ No checkin found for ${checkinId}`);
       return { statusCode: 200, body: JSON.stringify({ status: 'no checkin found' }) };
     }
+    console.log(`📦 Check-in found: type=${checkin.media_type}, path=${checkin.media_path}, text=${checkin.text_note?.substring(0, 50)}`);
 
     let transcript = '';
     const mediaType = checkin.media_type;
@@ -97,12 +112,20 @@ export async function handler(event) {
     }
 
     if (!transcript || transcript.trim().length < 5) {
+      console.log(`⚠️ Transcript too short: "${transcript}"`);
+      await supabase.from('checkins')
+        .update({ ai_analysis: { status: 'skipped', reason: 'transcript too short', timestamp: new Date().toISOString() } })
+        .eq('id', checkinId);
       return { statusCode: 200, body: JSON.stringify({ status: 'transcript too short' }) };
     }
 
+    console.log(`📝 Transcript (${transcript.length} chars): ${transcript.substring(0, 100)}...`);
+    console.log(`🤖 Calling Anthropic API...`);
     const analysis = await analyzeText(transcript);
+    console.log(`✅ Analysis received: mood=${analysis.mood}, keyPoints=${analysis.keyPoints?.length}`);
     const aiAnalysis = {
       ...analysis,
+      status: 'complete',
       transcript: (mediaType === 'video' || mediaType === 'audio') ? transcript : undefined,
       timestamp: new Date().toISOString(),
     };
@@ -130,11 +153,11 @@ export async function handler(event) {
 
     return { statusCode: 200, body: JSON.stringify({ status: 'done', checkinId }) };
   } catch (err) {
-    console.error(`❌ process-checkin error:`, err.message);
+    console.error(`❌ process-checkin error:`, err.message, err.stack);
     await supabase.from('checkins')
-      .update({ ai_analysis: { error: err.message, timestamp: new Date().toISOString() } })
+      .update({ ai_analysis: { status: 'error', error: err.message, timestamp: new Date().toISOString() } })
       .eq('id', checkinId)
-      .catch(() => {});
+      .catch((e) => console.error('❌ Failed to save error state:', e.message));
     return { statusCode: 200, body: JSON.stringify({ status: 'error', error: err.message }) };
   }
 }

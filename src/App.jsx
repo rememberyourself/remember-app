@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
@@ -8,6 +9,7 @@ import CoachDashboard from './pages/CoachDashboard';
 import ClientDetail from './pages/ClientDetail';
 import Profile from './pages/Profile';
 import Toolbox from './pages/Toolbox';
+import { getUnreadResponseCount } from './utils/api';
 
 function ProtectedRoute({ children, role }) {
   const { user, loading } = useAuth();
@@ -15,6 +17,46 @@ function ProtectedRoute({ children, role }) {
   if (!user) return <Navigate to="/login" />;
   if (role && user.role !== role) return <Navigate to="/" />;
   return children;
+}
+
+// Badge updater for client PWA
+function BadgeUpdater() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user || user.role !== 'client') return;
+    if (!('setAppBadge' in navigator)) return;
+
+    const updateBadge = async () => {
+      try {
+        const count = await getUnreadResponseCount(user.id);
+        if (count > 0) {
+          navigator.setAppBadge(count);
+        } else {
+          navigator.clearAppBadge();
+        }
+      } catch {}
+    };
+
+    // Check immediately
+    updateBadge();
+
+    // Poll every 60 seconds
+    const interval = setInterval(updateBadge, 60000);
+
+    // Also check on visibility change (when app comes to foreground)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') updateBadge();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user]);
+
+  return null;
 }
 
 function AppRoutes() {
@@ -57,6 +99,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <BadgeUpdater />
       <div className="min-h-dvh bg-forest-900">
         <AppRoutes />
       </div>

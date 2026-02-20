@@ -80,7 +80,7 @@ export async function createCheckin({ userId, date, ratings, practices, mediaTyp
 
   // Fire-and-forget: trigger async AI processing
   if (mediaType === 'video' || mediaType === 'audio' || mediaType === 'text') {
-    fetch('/api/process-checkin', {
+    fetch('/api/process-checkin-background', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ checkinId: checkin.id }),
@@ -418,12 +418,42 @@ export async function getLatestCoachResponse(clientId) {
   return checkin;
 }
 
+// ===== BADGE / UNREAD COUNT =====
+
+export async function getUnreadResponseCount(clientId) {
+  // Get last seen timestamp from localStorage
+  const lastSeen = localStorage.getItem(`remember_last_seen_${clientId}`) || '1970-01-01T00:00:00Z';
+
+  // Count check-ins with coach responses newer than lastSeen
+  const { data: checkins, error } = await supabase
+    .from('checkins')
+    .select('id, coach_response')
+    .eq('user_id', clientId)
+    .not('coach_response', 'is', null);
+
+  if (error || !checkins) return 0;
+
+  return checkins.filter(c => {
+    const cr = c.coach_response;
+    if (!cr || !cr.timestamp) return false;
+    return new Date(cr.timestamp) > new Date(lastSeen);
+  }).length;
+}
+
+export function markResponsesSeen(clientId) {
+  localStorage.setItem(`remember_last_seen_${clientId}`, new Date().toISOString());
+  // Clear badge
+  if ('clearAppBadge' in navigator) {
+    navigator.clearAppBadge().catch(() => {});
+  }
+}
+
 // ===== ANALYSIS =====
 
 export async function submitAnalysis(checkinId, analysis) {
   if (analysis.retrigger) {
     // Re-trigger AI analysis via serverless function
-    await fetch('/api/process-checkin', {
+    await fetch('/api/process-checkin-background', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ checkinId }),

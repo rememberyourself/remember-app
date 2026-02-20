@@ -526,7 +526,8 @@ function CoachResponseDisplay({ checkin, onReloadClient, respondingTo, setRespon
 }
 
 // ===== AI Analysis Display =====
-function AIAnalysisDisplay({ analysis }) {
+function AIAnalysisDisplay({ analysis, checkinId, onRetrigger }) {
+  // No analysis yet — show loading
   if (!analysis) {
     return (
       <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-forest-600/30">
@@ -540,6 +541,59 @@ function AIAnalysisDisplay({ analysis }) {
           <div className="h-3 bg-forest-700 rounded w-2/3 animate-pulse" />
         </div>
         <p className="text-earth-600 text-xs mt-3 italic">Analysis will appear here after processing...</p>
+        {onRetrigger && (
+          <button onClick={() => onRetrigger(checkinId)} className="mt-2 text-gold-500/70 text-xs hover:text-gold-500 transition-colors">
+            🔄 Trigger analysis
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Processing state
+  if (analysis.status === 'processing') {
+    return (
+      <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-forest-600/30">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg animate-spin">🤖</span>
+          <h4 className="text-earth-400 text-xs uppercase tracking-wider font-medium">AI Analysis</h4>
+        </div>
+        <div className="space-y-3 opacity-50">
+          <div className="h-3 bg-forest-700 rounded w-3/4 animate-pulse" />
+          <div className="h-3 bg-forest-700 rounded w-1/2 animate-pulse" />
+        </div>
+        <p className="text-earth-600 text-xs mt-3 italic">Processing... this may take a minute.</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (analysis.status === 'error' || analysis.error) {
+    return (
+      <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-red-500/30">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">🤖</span>
+          <h4 className="text-earth-400 text-xs uppercase tracking-wider font-medium">AI Analysis</h4>
+        </div>
+        <p className="text-red-400/80 text-xs">Analysis failed: {analysis.error || 'unknown error'}</p>
+        {onRetrigger && (
+          <button onClick={() => onRetrigger(checkinId)} className="mt-2 text-gold-500/70 text-xs hover:text-gold-500 transition-colors">
+            🔄 Retry analysis
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Skipped state
+  if (analysis.status === 'skipped') {
+    return (
+      <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-forest-600/30">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">🤖</span>
+          <h4 className="text-earth-400 text-xs uppercase tracking-wider font-medium">AI Analysis</h4>
+        </div>
+        <p className="text-earth-600 text-xs italic">Skipped — not enough content to analyze.</p>
       </div>
     );
   }
@@ -820,6 +874,28 @@ export default function ClientDetail() {
     getClientDetail(id).then(setClient).catch(() => {});
   };
 
+  const handleRetriggerAnalysis = async (checkinId) => {
+    try {
+      await fetch('/api/process-checkin-background', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkinId }),
+      });
+      // Reload after a short delay to show processing state
+      setTimeout(loadClient, 2000);
+    } catch {}
+  };
+
+  // Auto-refresh: poll for pending analyses every 15s
+  useEffect(() => {
+    const hasPending = client?.checkins?.some(c =>
+      !c.aiAnalysis || c.aiAnalysis?.status === 'processing'
+    );
+    if (!hasPending) return;
+    const interval = setInterval(loadClient, 15000);
+    return () => clearInterval(interval);
+  }, [client]);
+
   useEffect(() => { loadClient(); }, [id]);
 
   if (!client) {
@@ -1043,7 +1119,7 @@ export default function ClientDetail() {
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-forest-700/50 animate-fade-in">
                       {/* AI Analysis */}
-                      <AIAnalysisDisplay analysis={c.aiAnalysis} />
+                      <AIAnalysisDisplay analysis={c.aiAnalysis} checkinId={c.id} onRetrigger={handleRetriggerAnalysis} />
 
                       {/* Conversation Analysis (shows after replies exist) */}
                       <ConversationAnalysisDisplay analysis={c.conversationAnalysis} />
