@@ -9,7 +9,7 @@ import CoachDashboard from './pages/CoachDashboard';
 import ClientDetail from './pages/ClientDetail';
 import Profile from './pages/Profile';
 import Toolbox from './pages/Toolbox';
-import { getUnreadResponseCount } from './utils/api';
+import { getUnreadResponseCount, subscribeToPush } from './utils/api';
 
 function ProtectedRoute({ children, role }) {
   const { user, loading } = useAuth();
@@ -26,6 +26,31 @@ function BadgeUpdater() {
   useEffect(() => {
     if (!user || user.role !== 'client') return;
     if (!('setAppBadge' in navigator)) return;
+
+    // Request push notification permission and subscribe
+    const setupPush = async () => {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) {
+          // Already subscribed, ensure server knows
+          await subscribeToPush(user.id, existing.toJSON());
+          return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
+        });
+        await subscribeToPush(user.id, sub.toJSON());
+        console.log('[Push] Subscribed successfully');
+      } catch (e) {
+        console.log('[Push] Setup failed:', e.message);
+      }
+    };
+    setupPush();
 
     const updateBadge = async () => {
       try {

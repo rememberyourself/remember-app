@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl } from '../utils/api';
+import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl, triggerAIAnalysis } from '../utils/api';
 import VideoPlayer from '../components/VideoPlayer';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
@@ -528,23 +528,17 @@ function CoachResponseDisplay({ checkin, onReloadClient, respondingTo, setRespon
 
 // ===== AI Analysis Display =====
 function AIAnalysisDisplay({ analysis, checkinId, onRetrigger }) {
-  // No analysis yet — show loading
+  // No analysis yet — show button to trigger
   if (!analysis) {
     return (
-      <div className="mt-3 bg-forest-800/60 rounded-xl p-4 border border-forest-600/30">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">🤖</span>
-          <h4 className="text-earth-400 text-xs uppercase tracking-wider font-medium">AI Analysis</h4>
-        </div>
-        <div className="space-y-3 opacity-50">
-          <div className="h-3 bg-forest-700 rounded w-3/4 animate-pulse" />
-          <div className="h-3 bg-forest-700 rounded w-1/2 animate-pulse" />
-          <div className="h-3 bg-forest-700 rounded w-2/3 animate-pulse" />
-        </div>
-        <p className="text-earth-600 text-xs mt-3 italic">Analysis will appear here after processing...</p>
+      <div className="mt-3">
         {onRetrigger && (
-          <button onClick={() => onRetrigger(checkinId)} className="mt-2 text-gold-500/70 text-xs hover:text-gold-500 transition-colors">
-            🔄 Trigger analysis
+          <button 
+            onClick={() => onRetrigger(checkinId)} 
+            className="w-full py-2.5 px-4 bg-forest-800/60 rounded-xl border border-forest-600/30 hover:border-gold-500/30 transition-all flex items-center justify-center gap-2 group"
+          >
+            <span className="text-lg group-hover:scale-110 transition-transform">🤖</span>
+            <span className="text-earth-400 text-sm font-medium group-hover:text-gold-500 transition-colors">AI Analyse</span>
           </button>
         )}
       </div>
@@ -877,11 +871,7 @@ export default function ClientDetail() {
 
   const handleRetriggerAnalysis = async (checkinId) => {
     try {
-      await fetch('/api/process-checkin-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkinId }),
-      });
+      await triggerAIAnalysis(checkinId);
       // Reload after a short delay to show processing state
       setTimeout(loadClient, 2000);
     } catch {}

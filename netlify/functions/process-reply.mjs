@@ -132,6 +132,28 @@ export async function handler(event) {
       .eq('id', checkinId);
 
     console.log(`✅ Conversation analysis saved for ${checkinId}`);
+
+    // Send push notification to client if coach replied
+    if (replyFrom === 'coach') {
+      try {
+        const clientUserId = checkin.user_id;
+        const siteUrl = process.env.URL || 'https://rememberyourself-app.netlify.app';
+        await fetch(`${siteUrl}/api/send-push`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: clientUserId,
+            title: 'New message from your coach',
+            body: replyText?.substring(0, 100) || 'Your coach sent you a response',
+            url: '/dashboard',
+          }),
+        });
+        console.log(`📱 Push notification triggered for client ${clientUserId}`);
+      } catch (e) {
+        console.error(`⚠️ Push notification failed:`, e.message);
+      }
+    }
+
     return { statusCode: 200, body: JSON.stringify({ status: 'done', checkinId }) };
   } catch (err) {
     console.error(`❌ process-reply error:`, err.message);

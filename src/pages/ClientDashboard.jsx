@@ -391,7 +391,7 @@ export default function ClientDashboard() {
                   <p className="text-earth-300 text-sm italic">"{lastCheckin.coachResponse.text}"</p>
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'video' && (
-                  <video src={mediaUrl(lastCheckin.coachResponse.mediaPath) + "#t=0.001"} controls preload="auto" className="w-full rounded-lg mt-2" />
+                  <VideoPlayer src={mediaUrl(lastCheckin.coachResponse.mediaPath) + "#t=0.001"} className="mt-2" />
                 )}
                 {lastCheckin.coachResponse.mediaPath && lastCheckin.coachResponse.type === 'audio' && (
                   <AudioPlayer src={mediaUrl(lastCheckin.coachResponse.mediaPath)} className="mt-2" />

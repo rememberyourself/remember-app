@@ -78,14 +78,7 @@ export async function createCheckin({ userId, date, ratings, practices, mediaTyp
 
   const checkin = formatCheckin(data);
 
-  // Fire-and-forget: trigger async AI processing
-  if (mediaType === 'video' || mediaType === 'audio' || mediaType === 'text') {
-    fetch('/api/process-checkin-background', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checkinId: checkin.id }),
-    }).catch(() => {});
-  }
+  // AI analysis is now triggered manually by coach via button
 
   return checkin;
 }
@@ -446,6 +439,27 @@ export function markResponsesSeen(clientId) {
   if ('clearAppBadge' in navigator) {
     navigator.clearAppBadge().catch(() => {});
   }
+}
+
+// ===== PUSH NOTIFICATIONS =====
+
+export async function subscribeToPush(userId, subscription) {
+  await fetch('/api/push-subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, subscription }),
+  });
+}
+
+// ===== AI ANALYSIS (Manual Trigger) =====
+
+export async function triggerAIAnalysis(checkinId) {
+  const response = await fetch('/api/process-checkin-background', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checkinId }),
+  });
+  return response.status === 202;
 }
 
 // ===== ANALYSIS =====
