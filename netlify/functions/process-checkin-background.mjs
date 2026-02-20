@@ -100,13 +100,62 @@ export async function handler(event) {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const { checkinId } = JSON.parse(event.body || '{}');
+  const { checkinId, notifyOnly } = JSON.parse(event.body || '{}');
   if (!checkinId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'checkinId required' }) };
   }
 
   try {
-    console.log(`🧠 Processing check-in ${checkinId}`);
+    console.log(`🧠 Processing check-in ${checkinId}${notifyOnly ? ' (notify only)' : ''}`);
+
+    // If notifyOnly, skip AI analysis — just send notifications
+    if (notifyOnly) {
+      const { data: checkin } = await supabase.from('checkins').select('*').eq('id', checkinId).single();
+      if (!checkin) return { statusCode: 200, body: JSON.stringify({ status: 'no checkin' }) };
+
+      const { data: clientUser } = await supabase.from('users').select('name').eq('id', checkin.user_id).single();
+      const clientName = clientUser?.name || 'Unknown';
+      const mediaType = checkin.media_type;
+      const r = checkin.ratings || {};
+
+      // Telegram notification
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (token) {
+        const message = `🔔 New Check-in from ${clientName}\n📊 Heart: ${r.heart || '-'} | Mind: ${r.mind || '-'} | Presence: ${r.presence || '-'} | Energy: ${r.energy || '-'} | Connection: ${r.connection || '-'}\n🎥 Type: ${mediaType || 'none'}\n📅 ${checkin.date || new Date().toISOString().split('T')[0]}`;
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: '1379182535', text: message }),
+        }).catch(() => {});
+      }
+
+      // Push notification to all coaches
+      try {
+        const { data: coaches } = await supabase.from('users').select('id').eq('role', 'coach');
+        if (coaches?.length) {
+          const siteUrl = process.env.URL || 'https://rememberyourself-app.netlify.app';
+          const pushBody = `📊 Heart: ${r.heart || '-'} | Mind: ${r.mind || '-'} | Presence: ${r.presence || '-'}\n🎥 ${mediaType || 'text'}`;
+          for (const coach of coaches) {
+            await fetch(`${siteUrl}/api/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: coach.id,
+                title: `🔔 New check-in from ${clientName}`,
+                body: pushBody,
+                url: '/coach',
+              }),
+            }).catch(e => console.error(`⚠️ Coach push failed:`, e.message));
+          }
+          console.log(`📱 Coach push sent to ${coaches.length} coach(es)`);
+        }
+      } catch (e) {
+        console.error(`⚠️ Coach push error:`, e.message);
+      }
+
+      return { statusCode: 200, body: JSON.stringify({ status: 'notified', checkinId }) };
+    }
+
     console.log(`📋 Config: SUPABASE_URL=${SUPABASE_URL ? 'SET' : 'MISSING'}, ANTHROPIC_KEY=${process.env.ANTHROPIC_API_KEY ? 'SET' : 'MISSING'}, OPENAI_KEY=${process.env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
 
     // Mark as processing

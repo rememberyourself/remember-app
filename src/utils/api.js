@@ -78,7 +78,13 @@ export async function createCheckin({ userId, date, ratings, practices, mediaTyp
 
   const checkin = formatCheckin(data);
 
-  // AI analysis is now triggered manually by coach via button
+  // AI analysis is triggered manually by coach via button
+  // But we still need to send notifications (Telegram + Coach Push)
+  fetch('/api/process-checkin-background', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checkinId: checkin.id, notifyOnly: true }),
+  }).catch(() => {});
 
   return checkin;
 }
