@@ -476,7 +476,7 @@ export async function triggerAIAnalysis(checkinId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ checkinId }),
   });
-  return response.status === 202;
+  return response.ok; // Vercel returns 200, Netlify returned 202
 }
 
 // ===== ANALYSIS =====

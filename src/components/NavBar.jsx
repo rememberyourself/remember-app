@@ -55,7 +55,7 @@ export default function NavBar() {
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-forest-900 border-t border-forest-700/50 pb-[env(safe-area-inset-bottom)]" style={{ transform: 'translateZ(0)', WebkitTapHighlightColor: 'transparent' }}>
-        <div className="max-w-lg mx-auto flex items-center justify-around py-1.5" style={{ pointerEvents: 'auto' }}>
+        <div className="max-w-lg mx-auto flex items-center justify-around py-0.5" style={{ pointerEvents: 'auto' }}>
           {links.map(link => (
             <button
               key={link.path}
@@ -73,8 +73,8 @@ export default function NavBar() {
                   : 'text-earth-600 hover:text-earth-400'
               }`}
             >
-              <img src={link.iconSrc} alt={link.label} className={`w-9 h-9 ${link.extraClass || ''}`} />
-              <span className="text-[10px] uppercase tracking-wider">{link.label}</span>
+              <img src={link.iconSrc} alt={link.label} className={`w-12 h-12 ${link.extraClass || ''}`} />
+              <span className="text-xs uppercase tracking-wider">{link.label}</span>
             </button>
           ))}
         </div>
