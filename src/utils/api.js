@@ -199,28 +199,19 @@ export async function createInvite(name) {
 }
 
 export async function updateClient(clientId, data) {
-  const updates = {};
-  if (data.name) updates.name = data.name.trim();
-  if (data.code) updates.code = data.code.toUpperCase();
-
-  if (data.code) {
-    const { data: existing } = await supabase
-      .from('users')
-      .select('id')
-      .eq('code', data.code.toUpperCase())
-      .neq('id', clientId);
-    if (existing && existing.length > 0) throw new Error('Code already in use');
-  }
-
-  const { data: updated, error } = await supabase
-    .from('users')
-    .update(updates)
-    .eq('id', clientId)
-    .eq('role', 'client')
-    .select('id, name, code')
-    .single();
-  if (error) throw new Error(error.message);
-  return updated;
+  // Use serverless function to update both users table AND auth credentials
+  const res = await fetch('/api/update-client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      clientId,
+      name: data.name,
+      code: data.code,
+    }),
+  });
+  const result = await res.json();
+  if (!res.ok) throw new Error(result.error || 'Failed to update client');
+  return result;
 }
 
 export async function deleteClient(clientId) {
