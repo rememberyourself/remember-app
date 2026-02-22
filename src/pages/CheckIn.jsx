@@ -177,7 +177,7 @@ export default function CheckIn() {
         ? (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4')
         : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 500000 });
       chunksRef.current = [];
       
       recorder.ondataavailable = (e) => {

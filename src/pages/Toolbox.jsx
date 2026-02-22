@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getResources, mediaUrl } from '../utils/api';
+import AudioPlayer from '../components/AudioPlayer';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 
@@ -47,7 +48,8 @@ export default function Toolbox() {
                     {r.type === 'pdf' && <img src="/icons/pdf-icon.png" alt="PDF" className="w-6 h-6" />}
                     {r.type === 'video' && <img src="/icons/video-icon.png" alt="Video" className="w-6 h-6" />}
                     {r.type === 'image' && <img src="/icons/image-icon.png" alt="Image" className="w-6 h-6" />}
-                    {!['pdf','video','image'].includes(r.type) && <img src="/icons/pdf-icon.png" alt="File" className="w-6 h-6" />}
+                    {r.type === 'audio' && <span className="text-xl">🎵</span>}
+                    {!['pdf','video','image','audio'].includes(r.type) && <img src="/icons/pdf-icon.png" alt="File" className="w-6 h-6" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-warm-white font-medium text-sm">{r.title}</h3>
@@ -87,6 +89,9 @@ export default function Toolbox() {
                     className="w-full rounded-lg mt-3 cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => window.open(mediaUrl(r.filePath), '_blank')}
                   />
+                )}
+                {r.type === 'audio' && (
+                  <AudioPlayer src={mediaUrl(r.filePath)} className="mt-3" />
                 )}
               </div>
             ))}

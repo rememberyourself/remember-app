@@ -91,7 +91,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   useEffect(() => {
     if (responseType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
         .then(stream => {
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
           streamRef.current = stream;
@@ -108,7 +108,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -123,7 +123,7 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
         ? (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4')
         : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 500000 });
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -343,7 +343,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
   useEffect(() => {
     if (responseType === 'video' && !mediaBlob && !recording) {
       let cancelled = false;
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: false })
         .then(stream => {
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
           streamRef.current = stream;
@@ -360,7 +360,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
   const startRecording = useCallback(async (type) => {
     try {
       const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
+        ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
         : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -368,7 +368,7 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
       const mimeType = type === 'video'
         ? (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4')
         : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 500000 });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
@@ -528,17 +528,33 @@ function CoachResponseDisplay({ checkin, onReloadClient, respondingTo, setRespon
 
 // ===== AI Analysis Display =====
 function AIAnalysisDisplay({ analysis, checkinId, onRetrigger }) {
+  const [triggering, setTriggering] = useState(false);
+  
+  const handleTrigger = async () => {
+    if (triggering) return;
+    setTriggering(true);
+    try {
+      await onRetrigger(checkinId);
+    } finally {
+      // Keep loading state — will resolve when polling picks up the processing state
+      setTimeout(() => setTriggering(false), 30000);
+    }
+  };
+
   // No analysis yet — show button to trigger
   if (!analysis) {
     return (
       <div className="mt-3">
         {onRetrigger && (
           <button 
-            onClick={() => onRetrigger(checkinId)} 
-            className="w-full py-2.5 px-4 bg-forest-800/60 rounded-xl border border-forest-600/30 hover:border-gold-500/30 transition-all flex items-center justify-center gap-2 group"
+            onClick={handleTrigger}
+            disabled={triggering}
+            className="w-full py-2.5 px-4 bg-forest-800/60 rounded-xl border border-forest-600/30 hover:border-gold-500/30 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
           >
-            <span className="text-lg group-hover:scale-110 transition-transform">🤖</span>
-            <span className="text-earth-400 text-sm font-medium group-hover:text-gold-500 transition-colors">AI Analyse</span>
+            <span className={`text-lg ${triggering ? 'animate-spin' : 'group-hover:scale-110'} transition-transform`}>🤖</span>
+            <span className="text-earth-400 text-sm font-medium group-hover:text-gold-500 transition-colors">
+              {triggering ? 'Analysiere...' : 'AI Analyse'}
+            </span>
           </button>
         )}
       </div>
@@ -788,8 +804,8 @@ function ResourcesTab({ clientId }) {
               className="w-full h-16 bg-forest-700 border border-forest-600/50 rounded-lg px-3 py-2 text-warm-white placeholder-earth-700 text-sm focus:outline-none focus:border-gold-500/50 resize-none" />
             <div>
               <label className="block">
-                <span className="text-earth-400 text-xs mb-1 block">PDF, Video, or Image file</span>
-                <input type="file" accept=".pdf,video/*,image/*"
+                <span className="text-earth-400 text-xs mb-1 block">PDF, Video, Image, or Audio file</span>
+                <input type="file" accept=".pdf,video/*,image/*,audio/*,.mp3,.m4a,.wav,.ogg"
                   onChange={e => setFile(e.target.files[0])}
                   className="block w-full text-sm text-earth-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-forest-700 file:text-earth-300 hover:file:bg-forest-600 file:cursor-pointer" />
               </label>

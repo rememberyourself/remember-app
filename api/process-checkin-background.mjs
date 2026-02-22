@@ -148,6 +148,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'notified', checkinId });
     }
 
+    // Guard against double-trigger: skip if already processing or completed
+    if (checkin.ai_analysis?.status === 'processing') {
+      console.log(`⏭️ Check-in ${checkinId} already processing, skipping`);
+      return res.status(200).json({ status: 'already_processing', checkinId });
+    }
+    if (checkin.ai_analysis?.status === 'done' || checkin.ai_analysis?.keyPoints) {
+      console.log(`⏭️ Check-in ${checkinId} already analyzed, skipping`);
+      return res.status(200).json({ status: 'already_done', checkinId });
+    }
+
     // Full AI analysis
     await supabase.from('checkins')
       .update({ ai_analysis: { status: 'processing', timestamp: new Date().toISOString() } })

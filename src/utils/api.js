@@ -545,7 +545,8 @@ export async function uploadResource(clientId, { title, description, file }) {
   if (!uploadRes.ok) throw new Error('Resource upload failed');
 
   const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-  const fileType = ext === 'pdf' ? 'pdf' : imageExts.includes(ext) ? 'image' : 'video';
+  const audioExts = ['mp3', 'm4a', 'wav', 'ogg', 'aac', 'webm'];
+  const fileType = ext === 'pdf' ? 'pdf' : imageExts.includes(ext) ? 'image' : audioExts.includes(ext) ? 'audio' : 'video';
 
   const resource = {
     id: crypto.randomUUID(),
