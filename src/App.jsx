@@ -113,7 +113,7 @@ function PushSetup() {
 
   if (showBanner === 'unsupported') {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-earth-600/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+      <div className="fixed top-0 left-0 right-0 z-[200] bg-forest-800 border-b border-earth-600/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <span className="text-lg">📱</span>
         <p className="text-warm-white text-sm flex-1">Push notifications aren't available on this device. Add app to home screen for the best experience.</p>
         <button onClick={handleDismiss} className="text-earth-600 text-xs">OK</button>
@@ -123,7 +123,7 @@ function PushSetup() {
 
   if (showBanner === 'denied') {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-red-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+      <div className="fixed top-0 left-0 right-0 z-[200] bg-forest-800 border-b border-red-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <span className="text-lg">🔕</span>
         <p className="text-warm-white text-sm flex-1">Notifications are blocked. Enable them in your device Settings → this app.</p>
         <button onClick={handleDismiss} className="text-earth-600 text-xs">OK</button>
@@ -132,7 +132,7 @@ function PushSetup() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+    <div className="fixed top-0 left-0 right-0 z-[200] bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
       <span className="text-lg">🔔</span>
       <p className="text-warm-white text-sm flex-1">Enable notifications to stay connected?</p>
       <button onClick={handleEnable} className="px-3 py-1.5 bg-gold-500 text-forest-900 rounded-lg text-xs font-medium">
