@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
@@ -22,6 +22,7 @@ function ProtectedRoute({ children, role }) {
 // Push notification setup for ALL users (clients + coaches)
 function PushSetup() {
   const { user } = useAuth();
+  const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -35,14 +36,24 @@ function PushSetup() {
           await subscribeToPush(user.id, existing.toJSON());
           return;
         }
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
-        });
-        await subscribeToPush(user.id, sub.toJSON());
-        console.log(`[Push] Subscribed successfully (${user.role})`);
+        // Check if permission was already decided
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            // Permission already granted, subscribe
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
+            });
+            await subscribeToPush(user.id, sub.toJSON());
+            console.log(`[Push] Subscribed successfully (${user.role})`);
+          } else if (Notification.permission === 'default') {
+            // iOS requires user gesture to request permission — show banner
+            const dismissed = localStorage.getItem('push_banner_dismissed');
+            if (!dismissed) {
+              setShowBanner(true);
+            }
+          }
+        }
       } catch (e) {
         console.log('[Push] Setup failed:', e.message);
       }
@@ -50,7 +61,43 @@ function PushSetup() {
     setupPush();
   }, [user]);
 
-  return null;
+  const handleEnable = async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
+        });
+        await subscribeToPush(user.id, sub.toJSON());
+        console.log(`[Push] Subscribed after user gesture`);
+      }
+    } catch (e) {
+      console.log('[Push] Enable failed:', e.message);
+    }
+    setShowBanner(false);
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem('push_banner_dismissed', 'true');
+    setShowBanner(false);
+  };
+
+  if (!showBanner) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down">
+      <span className="text-lg">🔔</span>
+      <p className="text-warm-white text-sm flex-1">Enable notifications to stay connected?</p>
+      <button onClick={handleEnable} className="px-3 py-1.5 bg-gold-500 text-forest-900 rounded-lg text-xs font-medium">
+        Enable
+      </button>
+      <button onClick={handleDismiss} className="text-earth-600 text-xs">
+        Later
+      </button>
+    </div>
+  );
 }
 
 // Badge updater for both client and coach PWA

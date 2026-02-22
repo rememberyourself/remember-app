@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl, triggerAIAnalysis } from '../utils/api';
+import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl, triggerAIAnalysis, triggerConversationAnalysis } from '../utils/api';
 import VideoPlayer from '../components/VideoPlayer';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
@@ -107,16 +107,24 @@ function CoachResponseForm({ checkinId, onSubmitted, onCancel }) {
 
   const startRecording = useCallback(async (type) => {
     try {
-      const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
-        : { audio: true };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      if (type === 'video' && videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play();
+      let stream;
+      if (type === 'video' && streamRef.current) {
+        // Reuse existing preview stream and add audio track to avoid flicker
+        stream = streamRef.current;
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+        } catch {}
+      } else {
+        const constraints = type === 'video'
+          ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
+          : { audio: true };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
+        if (type === 'video' && videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = stream;
+          videoPreviewRef.current.play();
+        }
       }
 
       const mimeType = type === 'video'
@@ -359,12 +367,24 @@ function CoachReplyForm({ checkinId, onSubmitted, onCancel }) {
 
   const startRecording = useCallback(async (type) => {
     try {
-      const constraints = type === 'video'
-        ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
-        : { audio: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      if (type === 'video' && videoPreviewRef.current) { videoPreviewRef.current.srcObject = stream; videoPreviewRef.current.play(); }
+      let stream;
+      if (type === 'video' && streamRef.current) {
+        // Reuse existing preview stream and add audio track to avoid flicker
+        stream = streamRef.current;
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+        } catch {
+          // If audio fails, record without audio
+        }
+      } else {
+        const constraints = type === 'video'
+          ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } }, audio: true }
+          : { audio: true };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
+        if (type === 'video' && videoPreviewRef.current) { videoPreviewRef.current.srcObject = stream; videoPreviewRef.current.play(); }
+      }
       const mimeType = type === 'video'
         ? (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4')
         : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
@@ -674,7 +694,37 @@ function AIAnalysisDisplay({ analysis, checkinId, onRetrigger }) {
   );
 }
 
-function ConversationAnalysisDisplay({ analysis }) {
+function ConversationAnalysisDisplay({ analysis, checkinId, hasReplies, onRetrigger }) {
+  const [triggering, setTriggering] = useState(false);
+  
+  const handleTrigger = async () => {
+    if (triggering) return;
+    setTriggering(true);
+    try {
+      if (onRetrigger) await onRetrigger(checkinId);
+    } finally {
+      setTimeout(() => setTriggering(false), 30000);
+    }
+  };
+
+  // Show trigger button if there are replies but no analysis yet
+  if (!analysis && hasReplies) {
+    return (
+      <div className="mt-3">
+        <button 
+          onClick={handleTrigger}
+          disabled={triggering}
+          className="w-full py-2.5 px-4 bg-forest-800/60 rounded-xl border border-gold-500/20 hover:border-gold-500/40 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+        >
+          <span className={`text-lg ${triggering ? 'animate-spin' : 'group-hover:scale-110'} transition-transform`}>💬</span>
+          <span className="text-earth-400 text-sm font-medium group-hover:text-gold-500 transition-colors">
+            {triggering ? 'Analysiere Gespräch...' : 'Gespräch analysieren'}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   if (!analysis) return null;
 
   return (
@@ -685,6 +735,11 @@ function ConversationAnalysisDisplay({ analysis }) {
         <span className="text-earth-700 text-[10px] ml-auto">
           {analysis.replyCount} {analysis.replyCount === 1 ? 'reply' : 'replies'}
         </span>
+        {onRetrigger && (
+          <button onClick={handleTrigger} disabled={triggering} className="text-earth-600 hover:text-gold-500 text-xs transition-colors">
+            {triggering ? '⏳' : '🔄'}
+          </button>
+        )}
       </div>
 
       {/* Conversation Dynamic */}
@@ -888,8 +943,14 @@ export default function ClientDetail() {
   const handleRetriggerAnalysis = async (checkinId) => {
     try {
       await triggerAIAnalysis(checkinId);
-      // Reload after a short delay to show processing state
       setTimeout(loadClient, 2000);
+    } catch {}
+  };
+
+  const handleRetriggerConversationAnalysis = async (checkinId) => {
+    try {
+      await triggerConversationAnalysis(checkinId);
+      setTimeout(loadClient, 3000);
     } catch {}
   };
 
@@ -1129,7 +1190,12 @@ export default function ClientDetail() {
                       <AIAnalysisDisplay analysis={c.aiAnalysis} checkinId={c.id} onRetrigger={handleRetriggerAnalysis} />
 
                       {/* Conversation Analysis (shows after replies exist) */}
-                      <ConversationAnalysisDisplay analysis={c.conversationAnalysis} />
+                      <ConversationAnalysisDisplay 
+                        analysis={c.conversationAnalysis} 
+                        checkinId={c.id}
+                        hasReplies={(c.replies?.length || 0) > 0}
+                        onRetrigger={handleRetriggerConversationAnalysis}
+                      />
 
                       {/* Coach Response Thread */}
                       {c.coachResponse ? (

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remember-v5';
+const CACHE_NAME = 'remember-v6';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -40,13 +40,25 @@ self.addEventListener('push', (event) => {
     : data.title?.includes('Reply') ? 'client-reply-' + Date.now()
     : 'coach-response-' + Date.now();
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Remember', {
-      body: data.body || 'You have a new notification',
-      icon: '/app-icon-192.png',
-      badge: '/app-icon-192.png',
-      tag,
-      data: { url: data.url || '/dashboard' },
-    })
+    Promise.all([
+      self.registration.showNotification(data.title || 'Remember', {
+        body: data.body || 'You have a new notification',
+        icon: '/app-icon-192.png',
+        badge: '/app-icon-192.png',
+        tag,
+        data: { url: data.url || '/dashboard' },
+      }),
+      // Update app badge count
+      (async () => {
+        try {
+          if ('setAppBadge' in navigator) {
+            // Get current notifications to count badge
+            const notifications = await self.registration.getNotifications();
+            await navigator.setAppBadge(notifications.length + 1);
+          }
+        } catch {}
+      })(),
+    ])
   );
 });
 
@@ -56,16 +68,28 @@ self.addEventListener('notificationclick', (event) => {
   const targetPath = event.notification.data?.url || '/';
   const targetUrl = new URL(targetPath, self.location.origin).href;
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-      // Try to focus an existing window and navigate it
-      for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(targetUrl);
-          return client.focus();
+    Promise.all([
+      // Clear badge when user taps notification
+      (async () => {
+        try {
+          const remaining = await self.registration.getNotifications();
+          if (remaining.length === 0 && 'clearAppBadge' in navigator) {
+            await navigator.clearAppBadge();
+          } else if ('setAppBadge' in navigator) {
+            await navigator.setAppBadge(remaining.length);
+          }
+        } catch {}
+      })(),
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+        for (const client of windowClients) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
         }
-      }
-      return clients.openWindow(targetUrl);
-    })
+        return clients.openWindow(targetUrl);
+      }),
+    ])
   );
 });
 

@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { checkinId, replyFrom, replyType, replyText } = req.body || {};
+  const { checkinId, replyFrom, replyType, replyText, reAnalyze } = req.body || {};
   if (!checkinId) {
     return res.status(400).json({ error: 'checkinId required' });
   }
@@ -47,8 +47,14 @@ export default async function handler(req, res) {
   try {
     const siteUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.URL || 'https://rememberyourself-app.vercel.app');
 
+    // Re-analyze mode: skip notifications, just re-run conversation analysis
+    if (reAnalyze) {
+      console.log(`🔄 Re-analyzing conversation for ${checkinId}`);
+      // Jump straight to conversation analysis section below
+    }
+
     // 1. Telegram + Push notification when client replies
-    if (replyFrom === 'client') {
+    else if (replyFrom === 'client') {
       const { data: checkin } = await supabase.from('checkins').select('user_id').eq('id', checkinId).single();
       const { data: user } = await supabase.from('users').select('name').eq('id', checkin?.user_id).single();
       const clientName = user?.name || 'Unknown';

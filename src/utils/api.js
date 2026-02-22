@@ -478,7 +478,16 @@ export async function triggerAIAnalysis(checkinId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ checkinId }),
   });
-  return response.ok; // Vercel returns 200, Netlify returned 202
+  return response.ok;
+}
+
+export async function triggerConversationAnalysis(checkinId) {
+  const response = await fetch('/api/process-reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checkinId, reAnalyze: true }),
+  });
+  return response.ok;
 }
 
 // ===== ANALYSIS =====
