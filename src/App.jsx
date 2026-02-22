@@ -29,12 +29,21 @@ function PushSetup() {
 
     const setupPush = async () => {
       try {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-          console.log('[Push] Not supported in this browser');
+        // Check basic support
+        const hasSW = 'serviceWorker' in navigator;
+        const hasPush = 'PushManager' in window;
+        const hasNotification = 'Notification' in window;
+        console.log(`[Push] Support: SW=${hasSW}, Push=${hasPush}, Notification=${hasNotification}`);
+
+        if (!hasSW || !hasPush || !hasNotification) {
+          // Show banner anyway — tell user notifications aren't supported
+          console.log('[Push] Not fully supported, showing unsupported banner');
+          const dismissed = sessionStorage.getItem('push_banner_dismissed');
+          if (!dismissed) setShowBanner('unsupported');
           return;
         }
 
-        // Wait for service worker to be fully ready (important on fresh install)
+        // Wait for service worker to be fully ready
         console.log('[Push] Waiting for service worker ready...');
         const reg = await navigator.serviceWorker.ready;
         console.log('[Push] Service worker ready, checking subscription...');
@@ -46,37 +55,34 @@ function PushSetup() {
           return;
         }
 
-        // Check notification permission state
-        if ('Notification' in window) {
-          console.log(`[Push] Permission state: ${Notification.permission}`);
+        console.log(`[Push] Permission state: ${Notification.permission}`);
 
-          if (Notification.permission === 'granted') {
-            const sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
-            });
-            await subscribeToPush(user.id, sub.toJSON());
-            console.log(`[Push] Subscribed successfully (${user.role})`);
-          } else if (Notification.permission === 'denied') {
-            // Permission was denied before — show a different banner
-            console.log('[Push] Permission denied, showing re-enable banner');
-            setShowBanner('denied');
-          } else {
-            // Permission is 'default' — show opt-in banner (iOS needs user gesture)
-            console.log('[Push] Permission default, showing opt-in banner');
-            const dismissed = sessionStorage.getItem('push_banner_dismissed');
-            if (!dismissed) {
-              setShowBanner('default');
-            }
-          }
+        if (Notification.permission === 'granted') {
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
+          });
+          await subscribeToPush(user.id, sub.toJSON());
+          console.log(`[Push] Subscribed successfully (${user.role})`);
+        } else if (Notification.permission === 'denied') {
+          console.log('[Push] Permission denied, showing re-enable banner');
+          setShowBanner('denied');
+        } else {
+          // Permission is 'default' — show opt-in banner
+          console.log('[Push] Permission default, showing opt-in banner');
+          const dismissed = sessionStorage.getItem('push_banner_dismissed');
+          if (!dismissed) setShowBanner('default');
         }
       } catch (e) {
         console.log('[Push] Setup failed:', e.message);
+        // Still show banner on error so user knows something's up
+        const dismissed = sessionStorage.getItem('push_banner_dismissed');
+        if (!dismissed) setShowBanner('default');
       }
     };
 
     // Small delay to ensure SW registration has started
-    const timer = setTimeout(setupPush, 1000);
+    const timer = setTimeout(setupPush, 1500);
     return () => clearTimeout(timer);
   }, [user]);
 
@@ -105,20 +111,28 @@ function PushSetup() {
 
   if (!showBanner) return null;
 
+  if (showBanner === 'unsupported') {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-earth-600/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+        <span className="text-lg">📱</span>
+        <p className="text-warm-white text-sm flex-1">Push notifications aren't available on this device. Add app to home screen for the best experience.</p>
+        <button onClick={handleDismiss} className="text-earth-600 text-xs">OK</button>
+      </div>
+    );
+  }
+
   if (showBanner === 'denied') {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-red-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-red-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <span className="text-lg">🔕</span>
         <p className="text-warm-white text-sm flex-1">Notifications are blocked. Enable them in your device Settings → this app.</p>
-        <button onClick={handleDismiss} className="text-earth-600 text-xs">
-          OK
-        </button>
+        <button onClick={handleDismiss} className="text-earth-600 text-xs">OK</button>
       </div>
     );
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
       <span className="text-lg">🔔</span>
       <p className="text-warm-white text-sm flex-1">Enable notifications to stay connected?</p>
       <button onClick={handleEnable} className="px-3 py-1.5 bg-gold-500 text-forest-900 rounded-lg text-xs font-medium">

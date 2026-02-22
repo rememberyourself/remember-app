@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getClients, createInvite, updateClient, deleteClient } from '../utils/api';
+import { getClients, createInvite, updateClient, deleteClient, markCoachCheckinsSeen } from '../utils/api';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import Avatar from '../components/Avatar';
@@ -23,6 +23,7 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     loadClients();
+    markCoachCheckinsSeen();
   }, []);
 
   const loadClients = () => {

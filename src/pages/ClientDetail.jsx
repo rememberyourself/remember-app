@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl, triggerAIAnalysis, triggerConversationAnalysis } from '../utils/api';
+import { getClientDetail, submitCoachResponse, submitReply, getResources, uploadResource, deleteResource, uploadWithProgress, mediaUrl as getMediaUrl, triggerAIAnalysis, triggerConversationAnalysis, markCoachCheckinsSeen } from '../utils/api';
 import VideoPlayer from '../components/VideoPlayer';
 import { uploadMediaDirect } from '../utils/uploadMedia';
 import NavBar from '../components/NavBar';
@@ -964,7 +964,7 @@ export default function ClientDetail() {
     return () => clearInterval(interval);
   }, [client]);
 
-  useEffect(() => { loadClient(); }, [id]);
+  useEffect(() => { loadClient(); markCoachCheckinsSeen(); }, [id]);
 
   if (!client) {
     return (

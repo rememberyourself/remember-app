@@ -458,13 +458,30 @@ export async function markResponsesSeen(clientId) {
 
 // Get count of check-ins without coach response (for coach badge)
 export async function getUnreviewedCheckinCount() {
+  // Get coach's last_seen timestamp from users table
+  const { data: coaches } = await supabase
+    .from('users')
+    .select('last_seen')
+    .eq('role', 'coach')
+    .limit(1);
+  const lastSeen = coaches?.[0]?.last_seen || '1970-01-01T00:00:00Z';
+
+  // Count check-ins created AFTER coach last viewed
   const { data: checkins, error } = await supabase
     .from('checkins')
-    .select('id, coach_response')
-    .is('coach_response', null);
+    .select('id, created_at')
+    .gt('created_at', lastSeen);
 
   if (error || !checkins) return 0;
   return checkins.length;
+}
+
+export async function markCoachCheckinsSeen() {
+  const now = new Date().toISOString();
+  await supabase.from('users').update({ last_seen: now }).eq('role', 'coach');
+  if ('clearAppBadge' in navigator) {
+    navigator.clearAppBadge().catch(() => {});
+  }
 }
 
 // ===== PUSH NOTIFICATIONS =====
