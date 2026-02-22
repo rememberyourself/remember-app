@@ -8,13 +8,14 @@ import { useState, useRef, useEffect } from 'react';
  * - Falls back to canvas-generated poster if video metadata loads
  * - Streams directly from R2 (supports range requests)
  * - No blob download needed — browser buffers natively
+ * - Shows play button after 3s even if poster generation fails (CORS)
  */
 export default function VideoPlayer({ src, className = '', ...props }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const [posterUrl, setPosterUrl] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
+  const [posterReady, setPosterReady] = useState(false);
 
   // Generate poster from video first frame
   useEffect(() => {
@@ -22,6 +23,12 @@ export default function VideoPlayer({ src, className = '', ...props }) {
     setPosterUrl(null);
     setPlaying(false);
     setError(false);
+    setPosterReady(false);
+
+    // Fallback timer: show play button after 3s even if poster fails
+    const fallbackTimer = setTimeout(() => {
+      setPosterReady(true);
+    }, 3000);
 
     // Try to generate a canvas poster from the video
     const video = document.createElement('video');
@@ -35,6 +42,7 @@ export default function VideoPlayer({ src, className = '', ...props }) {
     let timeout;
     const cleanup = () => {
       clearTimeout(timeout);
+      clearTimeout(fallbackTimer);
       video.removeEventListener('seeked', onSeeked);
       video.removeEventListener('error', onError);
       video.removeEventListener('loadeddata', onLoaded);
@@ -44,7 +52,11 @@ export default function VideoPlayer({ src, className = '', ...props }) {
 
     const generatePoster = () => {
       try {
-        if (video.videoWidth === 0 || video.videoHeight === 0) return;
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          setPosterReady(true);
+          cleanup();
+          return;
+        }
         const canvas = document.createElement('canvas');
         // Use smaller size for poster to save memory
         const scale = Math.min(1, 320 / video.videoWidth);
@@ -56,7 +68,10 @@ export default function VideoPlayer({ src, className = '', ...props }) {
         if (dataUrl && dataUrl.length > 100) {
           setPosterUrl(dataUrl);
         }
-      } catch {}
+      } catch (e) {
+        console.log('[VideoPlayer] Poster generation failed (likely CORS):', e.message);
+      }
+      setPosterReady(true);
       cleanup();
     };
 
@@ -66,7 +81,10 @@ export default function VideoPlayer({ src, className = '', ...props }) {
         video.currentTime = 0.001;
       }
     };
-    const onError = () => cleanup();
+    const onError = () => {
+      setPosterReady(true);
+      cleanup();
+    };
 
     video.addEventListener('seeked', onSeeked, { once: true });
     video.addEventListener('loadeddata', onLoaded, { once: true });
@@ -74,9 +92,15 @@ export default function VideoPlayer({ src, className = '', ...props }) {
     video.load();
 
     // Timeout: don't wait forever for poster
-    timeout = setTimeout(cleanup, 5000);
+    timeout = setTimeout(() => {
+      setPosterReady(true);
+      cleanup();
+    }, 5000);
 
-    return cleanup;
+    return () => {
+      clearTimeout(fallbackTimer);
+      cleanup();
+    };
   }, [src]);
 
   const handlePlay = () => {
@@ -107,16 +131,25 @@ export default function VideoPlayer({ src, className = '', ...props }) {
             <img src={posterUrl} alt="" className="w-full rounded-lg" />
           ) : (
             <div className="w-full aspect-video bg-forest-700/50 flex items-center justify-center">
-              <div className="animate-pulse text-earth-600 text-xs">Loading preview...</div>
+              {!posterReady ? (
+                <div className="animate-pulse text-earth-600 text-xs">Loading preview...</div>
+              ) : (
+                <svg className="w-12 h-12 text-earth-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              )}
             </div>
           )}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full bg-black/40 border-2 border-white/60 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors">
-              <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
+          {/* Always show play button once poster is ready (or after timeout) */}
+          {(posterUrl || posterReady) && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-black/40 border-2 border-white/60 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors">
+                <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     );

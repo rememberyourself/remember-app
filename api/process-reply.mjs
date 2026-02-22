@@ -101,7 +101,33 @@ export default async function handler(req, res) {
 
     let conversationText = '';
     const existingAnalysis = checkin.ai_analysis || {};
-    const originalTranscript = existingAnalysis.transcript || checkin.text_note || '(no text)';
+    let originalTranscript = existingAnalysis.transcript || checkin.text_note || '';
+
+    // If original check-in has video/audio but no transcript yet, transcribe it now
+    if (!originalTranscript && (checkin.media_type === 'video' || checkin.media_type === 'audio') && checkin.media_path) {
+      console.log(`📝 Original check-in has ${checkin.media_type} but no transcript, transcribing...`);
+      try {
+        let buf;
+        const r2PublicUrl = process.env.R2_PUBLIC_URL;
+        if (r2PublicUrl && !checkin.media_path.startsWith('http')) {
+          const mediaFileUrl = `${r2PublicUrl}/${checkin.media_path}`;
+          const dlRes = await fetch(mediaFileUrl);
+          if (dlRes.ok) buf = Buffer.from(await dlRes.arrayBuffer());
+        } else {
+          const { data: fileData } = await supabase.storage.from('uploads').download(checkin.media_path);
+          if (fileData) buf = Buffer.from(await fileData.arrayBuffer());
+        }
+        if (buf) {
+          originalTranscript = await transcribeMedia(buf, checkin.media_path.split('.').pop() || 'webm');
+          console.log(`✅ Original check-in transcribed (${originalTranscript.length} chars)`);
+        }
+      } catch (e) {
+        console.error(`⚠️ Failed to transcribe original check-in:`, e.message);
+        originalTranscript = `(${checkin.media_type} — transcription failed)`;
+      }
+    }
+
+    if (!originalTranscript) originalTranscript = '(no text)';
     conversationText += `[CLIENT CHECK-IN]\n${originalTranscript}\n\n`;
 
     if (checkin.coach_response) {

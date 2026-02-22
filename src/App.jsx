@@ -29,28 +29,44 @@ function PushSetup() {
 
     const setupPush = async () => {
       try {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          console.log('[Push] Not supported in this browser');
+          return;
+        }
+
+        // Wait for service worker to be fully ready (important on fresh install)
+        console.log('[Push] Waiting for service worker ready...');
         const reg = await navigator.serviceWorker.ready;
+        console.log('[Push] Service worker ready, checking subscription...');
+
         const existing = await reg.pushManager.getSubscription();
         if (existing) {
+          console.log('[Push] Existing subscription found, syncing...');
           await subscribeToPush(user.id, existing.toJSON());
           return;
         }
-        // Check if permission was already decided
+
+        // Check notification permission state
         if ('Notification' in window) {
+          console.log(`[Push] Permission state: ${Notification.permission}`);
+
           if (Notification.permission === 'granted') {
-            // Permission already granted, subscribe
             const sub = await reg.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: 'BNHCzvyw21tTRy3VcLueMg4ozN5tW0mUKLRhAmWeaqbvInL1O_RItGId4pzwqPEspeiBHER19wvrcNW83BTNDKU',
             });
             await subscribeToPush(user.id, sub.toJSON());
             console.log(`[Push] Subscribed successfully (${user.role})`);
-          } else if (Notification.permission === 'default') {
-            // iOS requires user gesture to request permission — show banner
-            const dismissed = localStorage.getItem('push_banner_dismissed');
+          } else if (Notification.permission === 'denied') {
+            // Permission was denied before — show a different banner
+            console.log('[Push] Permission denied, showing re-enable banner');
+            setShowBanner('denied');
+          } else {
+            // Permission is 'default' — show opt-in banner (iOS needs user gesture)
+            console.log('[Push] Permission default, showing opt-in banner');
+            const dismissed = sessionStorage.getItem('push_banner_dismissed');
             if (!dismissed) {
-              setShowBanner(true);
+              setShowBanner('default');
             }
           }
         }
@@ -58,7 +74,10 @@ function PushSetup() {
         console.log('[Push] Setup failed:', e.message);
       }
     };
-    setupPush();
+
+    // Small delay to ensure SW registration has started
+    const timer = setTimeout(setupPush, 1000);
+    return () => clearTimeout(timer);
   }, [user]);
 
   const handleEnable = async () => {
@@ -80,11 +99,23 @@ function PushSetup() {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem('push_banner_dismissed', 'true');
+    sessionStorage.setItem('push_banner_dismissed', 'true');
     setShowBanner(false);
   };
 
   if (!showBanner) return null;
+
+  if (showBanner === 'denied') {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-red-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down">
+        <span className="text-lg">🔕</span>
+        <p className="text-warm-white text-sm flex-1">Notifications are blocked. Enable them in your device Settings → this app.</p>
+        <button onClick={handleDismiss} className="text-earth-600 text-xs">
+          OK
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down">

@@ -422,8 +422,13 @@ export async function getLatestCoachResponse(clientId) {
 // ===== BADGE / UNREAD COUNT =====
 
 export async function getUnreadResponseCount(clientId) {
-  // Get last seen timestamp from localStorage
-  const lastSeen = localStorage.getItem(`remember_last_seen_${clientId}`) || '1970-01-01T00:00:00Z';
+  // Get last_seen from server (survives cache clears, unlike localStorage)
+  const { data: userData } = await supabase
+    .from('users')
+    .select('last_seen')
+    .eq('id', clientId)
+    .single();
+  const lastSeen = userData?.last_seen || '1970-01-01T00:00:00Z';
 
   // Count check-ins with coach responses newer than lastSeen
   const { data: checkins, error } = await supabase
@@ -441,8 +446,10 @@ export async function getUnreadResponseCount(clientId) {
   }).length;
 }
 
-export function markResponsesSeen(clientId) {
-  localStorage.setItem(`remember_last_seen_${clientId}`, new Date().toISOString());
+export async function markResponsesSeen(clientId) {
+  // Update server-side last_seen (survives cache clears)
+  const now = new Date().toISOString();
+  await supabase.from('users').update({ last_seen: now }).eq('id', clientId).catch(() => {});
   // Clear badge
   if ('clearAppBadge' in navigator) {
     navigator.clearAppBadge().catch(() => {});
