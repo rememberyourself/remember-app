@@ -242,15 +242,26 @@ export async function getProfile(userId) {
 // ===== AVATAR =====
 
 export async function uploadAvatar(userId, file) {
-  // Upload to Supabase Storage
+  // Upload to R2 via presigned URL
   const ext = file.name?.split('.').pop() || 'jpg';
-  const filename = `${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await supabase.storage
-    .from('uploads')
-    .upload(filename, file, { contentType: file.type });
-  if (uploadError) throw new Error(uploadError.message);
+  const contentType = file.type || 'image/jpeg';
 
-  // Update user
+  const presignRes = await fetch('/api/presign-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extension: ext, contentType }),
+  });
+  if (!presignRes.ok) throw new Error('Failed to get upload URL');
+  const { presignedUrl, filename } = await presignRes.json();
+
+  const uploadRes = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
+  if (!uploadRes.ok) throw new Error('Avatar upload failed');
+
+  // Update user record in DB
   const { error } = await supabase
     .from('users')
     .update({ avatar: filename })
@@ -514,13 +525,24 @@ export async function getResources(clientId) {
 }
 
 export async function uploadResource(clientId, { title, description, file }) {
-  // Upload file to storage
+  // Upload file to R2 via presigned URL
   const ext = file.name?.split('.').pop()?.toLowerCase() || 'bin';
-  const filename = `${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await supabase.storage
-    .from('uploads')
-    .upload(filename, file, { contentType: file.type });
-  if (uploadError) throw new Error(uploadError.message);
+  const contentType = file.type || 'application/octet-stream';
+
+  const presignRes = await fetch('/api/presign-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extension: ext, contentType }),
+  });
+  if (!presignRes.ok) throw new Error('Failed to get upload URL');
+  const { presignedUrl, filename } = await presignRes.json();
+
+  const uploadRes = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
+  if (!uploadRes.ok) throw new Error('Resource upload failed');
 
   const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
   const fileType = ext === 'pdf' ? 'pdf' : imageExts.includes(ext) ? 'image' : 'video';

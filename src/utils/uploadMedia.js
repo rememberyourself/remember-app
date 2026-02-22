@@ -1,21 +1,18 @@
-import { supabase } from './supabase';
-
 /**
- * Upload media directly to Supabase Storage.
+ * Upload media to Cloudflare R2 via presigned URL.
  * 
- * Note: Progress tracking doesn't work on iOS Safari for cross-origin uploads.
- * We use a chunked approach: track upload start/complete as 0%/100%.
- * For detailed progress, we'd need TUS protocol (future improvement).
+ * Flow:
+ * 1. Request presigned upload URL from our API
+ * 2. PUT file directly to R2 (bypasses Vercel's 4.5MB limit)
+ * 3. Return the filename (used as key in DB)
  *
  * @param {Blob|File} file - The file/blob to upload
  * @param {string} extension - File extension (e.g. 'webm', 'mp4')
  * @param {function} onProgress - Progress callback (0-100)
- * @returns {Promise<string>} The storage path (filename) in Supabase
+ * @returns {Promise<string>} The filename (key) in R2
  */
 export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   if (onProgress) onProgress(0);
-
-  const filename = `${crypto.randomUUID()}.${extension}`;
 
   // Determine content type
   const mimeMap = {
@@ -25,16 +22,32 @@ export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   };
   const contentType = mimeMap[extension] || file.type || 'application/octet-stream';
 
-  // Simulate progress since iOS Safari doesn't fire cross-origin progress events.
-  // Estimate upload time based on file size (~500KB/s on cellular, faster on wifi)
-  let fakeProgress = 5;
+  // Step 1: Get presigned URL from our API
+  if (onProgress) onProgress(5);
+  
+  const presignRes = await fetch('/api/presign-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extension, contentType }),
+  });
+
+  if (!presignRes.ok) {
+    const err = await presignRes.json().catch(() => ({}));
+    throw new Error(`Failed to get upload URL: ${err.error || presignRes.statusText}`);
+  }
+
+  const { presignedUrl, filename } = await presignRes.json();
+
+  // Step 2: Upload directly to R2 via presigned URL
+  // Simulate progress since we can't track cross-origin XHR progress on iOS Safari
+  let fakeProgress = 10;
   let fakeInterval = null;
   if (onProgress) {
-    onProgress(5);
+    onProgress(10);
     const estimatedMs = Math.max(3000, Math.min(60000, (file.size / 500000) * 1000));
     const stepMs = 500;
     const steps = estimatedMs / stepMs;
-    const increment = 85 / steps; // Go from 5% to 90%
+    const increment = 80 / steps; // Go from 10% to 90%
     fakeInterval = setInterval(() => {
       fakeProgress = Math.min(90, fakeProgress + increment);
       onProgress(Math.round(fakeProgress));
@@ -42,15 +55,14 @@ export async function uploadMediaDirect(file, extension = 'webm', onProgress) {
   }
 
   try {
-    const { error } = await supabase.storage
-      .from('uploads')
-      .upload(filename, file, {
-        contentType,
-        upsert: false,
-      });
+    const uploadRes = await fetch(presignedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: file,
+    });
 
-    if (error) {
-      throw new Error(`Upload failed: ${error.message}`);
+    if (!uploadRes.ok) {
+      throw new Error(`Upload to R2 failed: ${uploadRes.statusText}`);
     }
   } finally {
     if (fakeInterval) clearInterval(fakeInterval);

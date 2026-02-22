@@ -109,9 +109,17 @@ export default async function handler(req, res) {
 
       if ((reply.type === 'video' || reply.type === 'audio') && reply.media_path && !text) {
         try {
-          const { data: fileData } = await supabase.storage.from('uploads').download(reply.media_path);
-          if (fileData) {
-            const buf = Buffer.from(await fileData.arrayBuffer());
+          let buf;
+          const r2PublicUrl = process.env.R2_PUBLIC_URL;
+          if (r2PublicUrl && !reply.media_path.startsWith('http')) {
+            const mediaUrl = `${r2PublicUrl}/${reply.media_path}`;
+            const dlRes = await fetch(mediaUrl);
+            if (dlRes.ok) buf = Buffer.from(await dlRes.arrayBuffer());
+          } else {
+            const { data: fileData } = await supabase.storage.from('uploads').download(reply.media_path);
+            if (fileData) buf = Buffer.from(await fileData.arrayBuffer());
+          }
+          if (buf) {
             text = await transcribeMedia(buf, reply.media_path.split('.').pop() || 'webm');
           }
         } catch (e) {

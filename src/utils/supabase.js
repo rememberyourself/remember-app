@@ -12,12 +12,20 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /**
- * Get public URL for a file in the 'uploads' bucket.
+ * Get public URL for a media file.
+ * Supports both old Supabase URLs (legacy) and new R2 URLs.
  */
+const R2_PUBLIC_URL = import.meta.env.VITE_R2_PUBLIC_URL;
+
 export function getPublicUrl(path) {
   if (!path) return null;
-  // If already a full URL, return as-is
+  // If already a full URL, return as-is (covers legacy Supabase URLs too)
   if (path.startsWith('http')) return path;
+  // New R2 path: just a filename like "uuid.webm"
+  if (R2_PUBLIC_URL) {
+    return `${R2_PUBLIC_URL}/${path}`;
+  }
+  // Fallback to Supabase (shouldn't happen once R2 is configured)
   const { data } = supabase.storage.from('uploads').getPublicUrl(path);
   return data.publicUrl;
 }

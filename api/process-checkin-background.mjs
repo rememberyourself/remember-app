@@ -157,9 +157,19 @@ export default async function handler(req, res) {
     const mediaPath = checkin.media_path;
 
     if ((mediaType === 'video' || mediaType === 'audio') && mediaPath) {
-      const { data: fileData, error: dlErr } = await supabase.storage.from('uploads').download(mediaPath);
-      if (dlErr) throw new Error(`Download error: ${dlErr.message}`);
-      const fileBuffer = Buffer.from(await fileData.arrayBuffer());
+      // Download media from R2 (or fall back to Supabase for legacy files)
+      let fileBuffer;
+      const r2PublicUrl = process.env.R2_PUBLIC_URL;
+      if (r2PublicUrl && !mediaPath.startsWith('http')) {
+        const mediaUrl = `${r2PublicUrl}/${mediaPath}`;
+        const dlRes = await fetch(mediaUrl);
+        if (!dlRes.ok) throw new Error(`R2 download error: ${dlRes.statusText}`);
+        fileBuffer = Buffer.from(await dlRes.arrayBuffer());
+      } else {
+        const { data: fileData, error: dlErr } = await supabase.storage.from('uploads').download(mediaPath);
+        if (dlErr) throw new Error(`Download error: ${dlErr.message}`);
+        fileBuffer = Buffer.from(await fileData.arrayBuffer());
+      }
       transcript = await transcribeMedia(fileBuffer, mediaPath.split('.').pop() || 'webm');
     } else if (mediaType === 'text' && checkin.text_note) {
       transcript = checkin.text_note;
