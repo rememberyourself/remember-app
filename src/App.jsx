@@ -106,7 +106,6 @@ function BadgeUpdater() {
 
   useEffect(() => {
     if (!user) return;
-    if (!('setAppBadge' in navigator)) return;
 
     const updateBadge = async () => {
       try {
@@ -117,10 +116,12 @@ function BadgeUpdater() {
           count = await getUnreviewedCheckinCount();
         }
         console.log(`[Badge] ${user.role} unread count: ${count}`);
-        if (count > 0) {
-          await navigator.setAppBadge(count);
-        } else {
-          await navigator.clearAppBadge();
+        if ('setAppBadge' in navigator) {
+          if (count > 0) {
+            await navigator.setAppBadge(count);
+          } else {
+            await navigator.clearAppBadge();
+          }
         }
       } catch (e) {
         console.log(`[Badge] Error:`, e.message);
@@ -128,16 +129,27 @@ function BadgeUpdater() {
     };
 
     updateBadge();
-    const interval = setInterval(updateBadge, 60000);
+    // Poll every 30s instead of 60s for faster badge updates
+    const interval = setInterval(updateBadge, 30000);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') updateBadge();
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
+    // Listen for push messages from Service Worker
+    const handleSWMessage = (event) => {
+      if (event.data?.type === 'PUSH_RECEIVED') {
+        console.log('[Badge] Push received, updating badge...');
+        updateBadge();
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
+      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
     };
   }, [user]);
 

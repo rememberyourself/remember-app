@@ -147,30 +147,31 @@ export default function CheckIn() {
 
   const startRecording = useCallback(async (type) => {
     try {
-      // Stop preview-only stream before getting full stream with audio
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
-
       let stream;
-      if (type === 'video') {
+      if (type === 'video' && streamRef.current) {
+        // Reuse existing preview stream, just add audio track (no flicker)
+        stream = streamRef.current;
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+        } catch {}
+      } else if (type === 'video') {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
             audio: true 
           });
         } catch {
-          // Fallback for iOS: simplest constraints
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
+        streamRef.current = stream;
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = stream;
+          videoPreviewRef.current.play();
         }
       } else {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      }
-      streamRef.current = stream;
-      
-      if (type === 'video' && videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play();
+        streamRef.current = stream;
       }
 
       const mimeType = type === 'video'

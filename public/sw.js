@@ -48,11 +48,15 @@ self.addEventListener('push', (event) => {
         tag,
         data: { url: data.url || '/dashboard' },
       }),
-      // Update app badge count
+      // Notify the main page to update badge (iOS doesn't support setAppBadge in SW)
       (async () => {
         try {
+          const allClients = await clients.matchAll({ type: 'window' });
+          for (const client of allClients) {
+            client.postMessage({ type: 'PUSH_RECEIVED', title: data.title });
+          }
+          // Also try setAppBadge in SW (works on Chrome/Android, not iOS)
           if ('setAppBadge' in navigator) {
-            // Get current notifications to count badge
             const notifications = await self.registration.getNotifications();
             await navigator.setAppBadge(notifications.length + 1);
           }
