@@ -145,7 +145,49 @@ function PushSetup() {
   );
 }
 
+// Global app resume handler for iOS PWA — fixes data refresh on app launch from homescreen
+function AppResumeHandler() {
+  useEffect(() => {
+    let backgroundTimestamp = null;
+
+    const handlePageShow = (event) => {
+      // 'pageshow' fires on iOS PWA resume (unlike visibilitychange)
+      if (event.persisted) {
+        console.log('[AppResume] pageshow with persisted=true, dispatching app-resume');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('app-resume', { detail: { source: 'pageshow' } }));
+        }, 300);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        backgroundTimestamp = Date.now();
+      } else if (document.visibilityState === 'visible' && backgroundTimestamp) {
+        const timeDiff = Date.now() - backgroundTimestamp;
+        console.log(`[AppResume] App visible after ${Math.round(timeDiff / 1000)}s in background`);
+        if (timeDiff > 60000) {
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('app-resume', { detail: { source: 'visibilitychange', backgroundTime: timeDiff } }));
+          }, 300);
+        }
+        backgroundTimestamp = null;
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  return null;
+}
+
 // Badge updater for both client and coach PWA
+// iOS Note: iOS doesn't support setAppBadge in Service Workers. iOS badges come from notification count only.
 function BadgeUpdater() {
   const { user } = useAuth();
 
@@ -244,6 +286,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <AppResumeHandler />
       <PushSetup />
       <BadgeUpdater />
       <div className="min-h-dvh bg-forest-900">

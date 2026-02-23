@@ -238,19 +238,25 @@ export default function ClientDashboard() {
 
   useEffect(() => { loadData(); }, [user.id]);
 
-  // Auto-refresh: poll every 30s + refresh on visibility change + focus (iOS PWA)
+  // Auto-refresh: poll every 30s + refresh on visibility change + focus + app resume (iOS PWA)
   useEffect(() => {
     const interval = setInterval(loadData, 30000);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') loadData();
     };
     const handleFocus = () => loadData();
+    const handleAppResume = () => {
+      console.log('[ClientDashboard] app-resume event, refreshing data');
+      loadData();
+    };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('app-resume', handleAppResume);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('app-resume', handleAppResume);
     };
   }, [user.id]);
 
