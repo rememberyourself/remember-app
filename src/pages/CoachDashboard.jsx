@@ -26,6 +26,21 @@ export default function CoachDashboard() {
     markCoachCheckinsSeen();
   }, []);
 
+  // Auto-refresh on visibility change + focus (PWA coming from homescreen)
+  useEffect(() => {
+    const refresh = () => { loadClients(); markCoachCheckinsSeen(); };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const handleFocus = () => refresh();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   const loadClients = () => {
     getClients().then(setClients).catch(() => {});
   };

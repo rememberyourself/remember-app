@@ -180,7 +180,9 @@ function BadgeUpdater() {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') updateBadge();
     };
+    const handleFocus = () => updateBadge();
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
 
     // Listen for push messages from Service Worker
     const handleSWMessage = (event) => {
@@ -194,6 +196,7 @@ function BadgeUpdater() {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
       navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
     };
   }, [user]);
