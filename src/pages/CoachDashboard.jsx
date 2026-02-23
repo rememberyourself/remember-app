@@ -27,20 +27,43 @@ export default function CoachDashboard() {
   }, []);
 
   // Auto-refresh on visibility change + focus + app resume (iOS PWA homescreen)
+  // Added polling for new clients detection and force cache-bypass
   useEffect(() => {
-    const refresh = () => { loadClients(); markCoachCheckinsSeen(); };
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refresh();
+    const refresh = () => { 
+      console.log('[CoachDashboard] Force refreshing clients and marking seen');
+      loadClients(); 
+      markCoachCheckinsSeen(); 
     };
-    const handleFocus = () => refresh();
-    const handleAppResume = () => {
-      console.log('[CoachDashboard] app-resume event, refreshing data');
+    
+    // Polling every 15 seconds for new client detection
+    const interval = setInterval(refresh, 15000);
+    
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[CoachDashboard] App visible, force refresh');
+        refresh();
+      }
+    };
+    
+    const handleFocus = () => {
+      console.log('[CoachDashboard] App focused, force refresh');  
       refresh();
     };
+    
+    const handleAppResume = () => {
+      console.log('[CoachDashboard] app-resume event, force refreshing data');
+      refresh();
+    };
+    
+    // Immediate refresh on first load
+    refresh();
+    
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('app-resume', handleAppResume);
+    
     return () => {
+      clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('app-resume', handleAppResume);

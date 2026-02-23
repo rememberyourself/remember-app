@@ -149,37 +149,57 @@ function PushSetup() {
 function AppResumeHandler() {
   useEffect(() => {
     let backgroundTimestamp = null;
+    let isFirstLoad = true;
 
     const handlePageShow = (event) => {
-      // 'pageshow' fires on iOS PWA resume (unlike visibilitychange)
-      if (event.persisted) {
-        console.log('[AppResume] pageshow with persisted=true, dispatching app-resume');
+      console.log('[AppResume] pageshow event', { persisted: event.persisted, isFirstLoad });
+      // Always dispatch on pageshow for iOS PWA (even without persisted flag)
+      if (event.persisted || !isFirstLoad) {
+        console.log('[AppResume] pageshow detected app resume, dispatching event');
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('app-resume', { detail: { source: 'pageshow' } }));
-        }, 300);
+        }, 100);
       }
+      isFirstLoad = false;
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         backgroundTimestamp = Date.now();
-      } else if (document.visibilityState === 'visible' && backgroundTimestamp) {
-        const timeDiff = Date.now() - backgroundTimestamp;
+        console.log('[AppResume] App going to background');
+      } else if (document.visibilityState === 'visible') {
+        const timeDiff = backgroundTimestamp ? Date.now() - backgroundTimestamp : 0;
         console.log(`[AppResume] App visible after ${Math.round(timeDiff / 1000)}s in background`);
-        if (timeDiff > 60000) {
+        
+        // More aggressive force refresh - any background time > 30s
+        if (timeDiff > 30000) {
           setTimeout(() => {
+            console.log('[AppResume] Dispatching app-resume due to significant background time');
             window.dispatchEvent(new CustomEvent('app-resume', { detail: { source: 'visibilitychange', backgroundTime: timeDiff } }));
-          }, 300);
+          }, 100);
         }
         backgroundTimestamp = null;
       }
     };
 
+    // Also listen for focus/blur for additional reliability
+    const handleFocus = () => {
+      console.log('[AppResume] Window focus detected');
+      if (!isFirstLoad) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('app-resume', { detail: { source: 'focus' } }));
+        }, 100);
+      }
+    };
+
     window.addEventListener('pageshow', handlePageShow);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
     return () => {
       window.removeEventListener('pageshow', handlePageShow);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -210,36 +230,74 @@ function BadgeUpdater() {
             await navigator.clearAppBadge();
           }
         }
+        
+        // Also send to service worker for cross-tab sync
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.active?.postMessage({
+              type: 'SET_BADGE',
+              count: count
+            });
+          }).catch(() => {});
+        }
       } catch (e) {
         console.log(`[Badge] Error:`, e.message);
       }
     };
 
     updateBadge();
-    // Poll every 30s instead of 60s for faster badge updates
-    const interval = setInterval(updateBadge, 30000);
+    // Poll every 20s for more responsive badge updates
+    const interval = setInterval(updateBadge, 20000);
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') updateBadge();
-    };
-    const handleFocus = () => updateBadge();
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleFocus);
-
-    // Listen for push messages from Service Worker
-    const handleSWMessage = (event) => {
-      if (event.data?.type === 'PUSH_RECEIVED') {
-        console.log('[Badge] Push received, updating badge...');
+      if (document.visibilityState === 'visible') {
+        console.log('[Badge] App visible, force updating badge');
         updateBadge();
       }
     };
-    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
+    const handleFocus = () => {
+      console.log('[Badge] App focused, force updating badge');
+      updateBadge();
+    };
+    
+    // Better Service Worker message handling
+    const handleSWMessage = (event) => {
+      if (event.data?.type === 'PUSH_RECEIVED') {
+        console.log('[Badge] Push received from SW, updating badge...');
+        // Small delay to ensure push notification is processed
+        setTimeout(updateBadge, 500);
+      }
+    };
+
+    // App resume handler for PWA homescreen launches
+    const handleAppResume = () => {
+      console.log('[Badge] App resumed, force updating badge');
+      setTimeout(updateBadge, 300);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('app-resume', handleAppResume);
+    
+    // More robust SW message listener
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+      // Also listen on the registration
+      navigator.serviceWorker.ready.then(registration => {
+        if (registration.active) {
+          registration.active.addEventListener('message', handleSWMessage);
+        }
+      }).catch(() => {});
+    }
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleFocus);
-      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
+      window.removeEventListener('app-resume', handleAppResume);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
     };
   }, [user]);
 

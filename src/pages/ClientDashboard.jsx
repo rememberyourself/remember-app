@@ -238,20 +238,39 @@ export default function ClientDashboard() {
 
   useEffect(() => { loadData(); }, [user.id]);
 
-  // Auto-refresh: poll every 30s + refresh on visibility change + focus + app resume (iOS PWA)
+  // Auto-refresh: poll every 20s + refresh on visibility change + focus + app resume (iOS PWA)
+  // Improved force-reload detection for better data freshness
   useEffect(() => {
-    const interval = setInterval(loadData, 30000);
+    // More frequent polling for better responsiveness
+    const interval = setInterval(() => {
+      console.log('[ClientDashboard] Scheduled refresh');
+      loadData();
+    }, 20000);
+    
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') loadData();
+      if (document.visibilityState === 'visible') {
+        console.log('[ClientDashboard] App visible, force refreshing data');
+        loadData();
+      }
     };
-    const handleFocus = () => loadData();
-    const handleAppResume = () => {
-      console.log('[ClientDashboard] app-resume event, refreshing data');
+    
+    const handleFocus = () => {
+      console.log('[ClientDashboard] App focused, force refreshing data');
       loadData();
     };
+    
+    const handleAppResume = () => {
+      console.log('[ClientDashboard] app-resume event, force refreshing data');
+      loadData();
+    };
+    
+    // Force immediate refresh on mount
+    loadData();
+    
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('app-resume', handleAppResume);
+    
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
