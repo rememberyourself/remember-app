@@ -55,8 +55,10 @@ self.addEventListener('push', (event) => {
           for (const client of allClients) {
             client.postMessage({ type: 'PUSH_RECEIVED', title: data.title });
           }
-          // Also try setAppBadge in SW (works on Chrome/Android, not iOS)
-          if ('setAppBadge' in navigator) {
+          // Set app badge from push payload (works on Chrome/Android, not iOS)
+          if ('setAppBadge' in navigator && data.badge !== undefined) {
+            await navigator.setAppBadge(data.badge);
+          } else if ('setAppBadge' in navigator) {
             const notifications = await self.registration.getNotifications();
             await navigator.setAppBadge(notifications.length + 1);
           }

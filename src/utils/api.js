@@ -341,6 +341,21 @@ export async function submitCoachResponse(checkinId, { type, text, mediaPath }) 
     .eq('checkin_id', checkinId)
     .order('timestamp', { ascending: true });
   checkin.replies = (replies || []).map(formatReply);
+  
+  // Update badge after coach responds
+  try {
+    const unreviewedCount = await getUnreviewedCheckinCount();
+    if ('setAppBadge' in navigator) {
+      if (unreviewedCount > 0) {
+        await navigator.setAppBadge(unreviewedCount);
+      } else {
+        await navigator.clearAppBadge();
+      }
+    }
+  } catch (e) {
+    console.error('Badge update after coach response failed:', e);
+  }
+  
   return checkin;
 }
 
@@ -458,30 +473,21 @@ export async function markResponsesSeen(clientId) {
 
 // Get count of check-ins without coach response (for coach badge)
 export async function getUnreviewedCheckinCount() {
-  // Get coach's last_seen timestamp from users table
-  const { data: coaches } = await supabase
-    .from('users')
-    .select('last_seen')
-    .eq('role', 'coach')
-    .limit(1);
-  const lastSeen = coaches?.[0]?.last_seen || '1970-01-01T00:00:00Z';
-
-  // Count check-ins created AFTER coach last viewed
+  // Count check-ins that don't have a coach_response (same as in-app display)
   const { data: checkins, error } = await supabase
     .from('checkins')
-    .select('id, created_at')
-    .gt('created_at', lastSeen);
+    .select('id')
+    .is('coach_response', null);
 
   if (error || !checkins) return 0;
   return checkins.length;
 }
 
 export async function markCoachCheckinsSeen() {
+  // Only update the last_seen timestamp for dashboard view tracking
+  // Don't clear badge here - badge should only clear when coaches respond to check-ins
   const now = new Date().toISOString();
   await supabase.from('users').update({ last_seen: now }).eq('role', 'coach');
-  if ('clearAppBadge' in navigator) {
-    navigator.clearAppBadge().catch(() => {});
-  }
 }
 
 // ===== PUSH NOTIFICATIONS =====

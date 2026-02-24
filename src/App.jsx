@@ -132,15 +132,28 @@ function PushSetup() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[200] bg-forest-800 border-b border-gold-500/30 px-4 py-3 flex items-center gap-3 animate-slide-down" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
-      <span className="text-lg">🔔</span>
-      <p className="text-warm-white text-sm flex-1">Enable notifications to stay connected?</p>
-      <button onClick={handleEnable} className="px-3 py-1.5 bg-gold-500 text-forest-900 rounded-lg text-xs font-medium">
-        Enable
-      </button>
-      <button onClick={handleDismiss} className="text-earth-600 text-xs">
-        Later
-      </button>
+    <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-forest-800 rounded-2xl p-6 border border-gold-500/30 max-w-sm w-full text-center animate-slide-up shadow-2xl">
+        <div className="text-4xl mb-4">🔔</div>
+        <h3 className="text-warm-white text-lg font-medium mb-2">Stay Connected</h3>
+        <p className="text-earth-300 text-sm mb-6 leading-relaxed">
+          Enable notifications to receive updates from your coach and never miss important messages.
+        </p>
+        <div className="flex flex-col gap-3">
+          <button 
+            onClick={handleEnable} 
+            className="px-6 py-3 bg-gold-500 hover:bg-gold-400 text-forest-900 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Enable Notifications
+          </button>
+          <button 
+            onClick={handleDismiss} 
+            className="text-earth-500 hover:text-earth-400 text-sm transition-colors"
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

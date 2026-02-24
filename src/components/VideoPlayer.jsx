@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from 'react';
  * to show the first frame as a thumbnail. No canvas needed (avoids CORS issues).
  * On play: streams directly from R2 (supports range requests).
  */
-export default function VideoPlayer({ src, className = '', ...props }) {
+export default function VideoPlayer({ src, className = '', onEnded, ...props }) {
   const videoRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
@@ -83,6 +83,7 @@ export default function VideoPlayer({ src, className = '', ...props }) {
         playsInline
         preload="auto"
         onError={() => setError(true)}
+        onEnded={onEnded}
         className="w-full rounded-lg"
         style={{ transform: 'translateZ(0)' }}
         {...props}

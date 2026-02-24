@@ -71,19 +71,37 @@ export default async function handler(req, res) {
       }
 
       try {
-        const { data: coaches } = await supabase.from('users').select('id').eq('role', 'coach');
-        if (coaches?.length) {
+        console.log(`🔔 Sending coach notification for reply from ${clientName}`);
+        const { data: coaches, error: coachError } = await supabase.from('users').select('id').eq('role', 'coach');
+        
+        if (coachError) {
+          console.error(`⚠️ Coach lookup error:`, coachError.message);
+        } else if (!coaches?.length) {
+          console.log(`⚠️ No coaches found in database`);
+        } else {
+          console.log(`📬 Found ${coaches.length} coach(es), sending notifications`);
           for (const coach of coaches) {
-            await fetch(`${siteUrl}/api/send-push`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: coach.id,
-                title: `💬 Reply from ${clientName}`,
-                body: preview,
-                url: '/coach',
-              }),
-            }).catch(e => console.error(`⚠️ Coach push failed:`, e.message));
+            try {
+              console.log(`📤 Sending push to coach ${coach.id}`);
+              const pushResponse = await fetch(`${siteUrl}/api/send-push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: coach.id,
+                  title: `💬 Reply from ${clientName}`,
+                  body: preview,
+                  url: '/coach',
+                }),
+              });
+              
+              if (!pushResponse.ok) {
+                console.error(`⚠️ Push failed for coach ${coach.id}: ${pushResponse.status}`);
+              } else {
+                console.log(`✅ Push sent to coach ${coach.id}`);
+              }
+            } catch (e) {
+              console.error(`⚠️ Coach push failed for ${coach.id}:`, e.message);
+            }
           }
         }
       } catch (e) {

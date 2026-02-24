@@ -6,6 +6,50 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// Helper function to calculate badge count for user
+async function getBadgeCount(userId) {
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('role, last_seen')
+      .eq('id', userId)
+      .single();
+    
+    if (!user) return 0;
+    
+    if (user.role === 'client') {
+      // Count coach responses newer than client's last_seen
+      const lastSeen = user.last_seen || '1970-01-01T00:00:00Z';
+      const { data: checkins } = await supabase
+        .from('checkins')
+        .select('coach_response')
+        .eq('user_id', userId)
+        .not('coach_response', 'is', null);
+      
+      if (!checkins) return 0;
+      
+      return checkins.filter(c => {
+        const cr = c.coach_response;
+        if (!cr || !cr.timestamp) return false;
+        return new Date(cr.timestamp) > new Date(lastSeen);
+      }).length;
+    } else if (user.role === 'coach') {
+      // Count check-ins that don't have a coach_response (consistent with in-app display)
+      const { data: checkins } = await supabase
+        .from('checkins')
+        .select('id')
+        .is('coach_response', null);
+      
+      return checkins?.length || 0;
+    }
+    
+    return 0;
+  } catch (e) {
+    console.error('Badge count calculation error:', e.message);
+    return 0;
+  }
+}
+
 webpush.setVapidDetails(
   'mailto:jackbotty79@gmail.com',
   process.env.VAPID_PUBLIC_KEY,
@@ -39,10 +83,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ sent: 0, reason: 'no subscriptions' });
     }
 
+    // Calculate badge count for this user
+    const badgeCount = await getBadgeCount(userId);
+    
     const payload = JSON.stringify({
       title: title || 'Remember',
       body: body || 'You have a new notification',
       url: url || '/dashboard',
+      badge: badgeCount,
     });
 
     let sent = 0;
@@ -53,7 +101,7 @@ export default async function handler(req, res) {
         await webpush.sendNotification(sub, payload);
         validSubs.push(sub);
         sent++;
-        console.log(`✅ Push sent`);
+        console.log(`✅ Push sent (badge: ${badgeCount})`);
       } catch (e) {
         console.error(`❌ Push failed:`, e.statusCode || e.message);
         if (e.statusCode !== 410 && e.statusCode !== 404) {
