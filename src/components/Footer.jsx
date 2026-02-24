@@ -11,7 +11,7 @@ export default function Footer() {
           rememberyourself.ch
         </a>
       </p>
-      <p className="text-earth-700 text-[10px]">© 2026 Remember Yourself · <span className="text-earth-800">v14</span></p>
+      <p className="text-earth-700 text-[10px]">© 2026 Remember Yourself · <span className="text-earth-800">v15</span></p>
     </footer>
   );
 }

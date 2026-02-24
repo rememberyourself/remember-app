@@ -211,18 +211,27 @@ export default function ClientDashboard() {
   const [latestResponse, setLatestResponse] = useState(null);
   const [hasNewResponse, setHasNewResponse] = useState(false);
   const [showReply, setShowReply] = useState(false);
+  const [showSeenResponse, setShowSeenResponse] = useState(false);
   // Track which response timestamp we've already marked as seen locally.
   // Prevents the red dot from reappearing due to a race condition where
   // loadData() re-runs before the Supabase last_seen update has committed.
+  // sessionStorage backup survives SPA navigation (ref dies on unmount).
   const seenResponseTimestampRef = useRef(null);
 
-  // Mark a response as seen: update DB + local tracking ref
-  const handleMarkSeen = useCallback(() => {
+  // Mark a response as seen: update DB + local tracking ref + sessionStorage backup
+  const handleMarkSeen = useCallback(async () => {
     if (hasNewResponse) {
       const responseTimestamp = latestResponse?.coachResponse?.timestamp;
       seenResponseTimestampRef.current = responseTimestamp;
-      markResponsesSeen(user.id);
+      // sessionStorage survives SPA navigation; ref does not
+      if (responseTimestamp) {
+        sessionStorage.setItem('seen_response_ts', responseTimestamp);
+      }
       setHasNewResponse(false);
+      const success = await markResponsesSeen(user.id);
+      if (!success) {
+        console.error('[ClientDashboard] markResponsesSeen DB write failed — sessionStorage backup still active');
+      }
     }
   }, [hasNewResponse, latestResponse, user.id]);
 
@@ -231,9 +240,12 @@ export default function ClientDashboard() {
     getLatestCoachResponse(user.id).then(data => {
       setLatestResponse(data);
       const responseTimestamp = data?.coachResponse?.timestamp;
-      // If we already marked this specific response as seen locally (via seenResponseTimestampRef),
-      // keep hasNewResponse=false even if DB hasn't committed yet (race condition fix).
-      const isNew = data?.hasNewResponse && responseTimestamp !== seenResponseTimestampRef.current;
+      // If we already marked this specific response as seen locally (via seenResponseTimestampRef
+      // or sessionStorage backup which survives SPA navigation), keep hasNewResponse=false
+      // even if DB hasn't committed yet (race condition fix).
+      const isNew = data?.hasNewResponse
+        && responseTimestamp !== seenResponseTimestampRef.current
+        && responseTimestamp !== sessionStorage.getItem('seen_response_ts');
       setHasNewResponse(!!isNew);
     }).catch(() => {});
     getCheckins(user.id).then(data => {
@@ -319,8 +331,9 @@ export default function ClientDashboard() {
           ); })()}
         </div>
 
-        {/* Latest Coach Response — prominent card */}
-        {latestResponse?.coachResponse && (
+        {/* Latest Coach Response */}
+        {latestResponse?.coachResponse && hasNewResponse && (
+          /* NEW response — prominent card with gold border, red dot */
           <div className="animate-slide-up stagger-1 opacity-0 mb-6" onClick={handleMarkSeen}>
             <div className="bg-forest-800 rounded-2xl p-5 border-2 border-gold-500/30 relative overflow-hidden">
               {/* Gold accent bar */}
@@ -329,14 +342,10 @@ export default function ClientDashboard() {
               <div className="flex items-center gap-2 mb-3">
                 <div className="relative">
                   <img src="/icons/coach-response.png" alt="Coach" className="w-10 h-10" />
-                  {hasNewResponse && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-forest-800 animate-pulse" />
-                  )}
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-forest-800 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-warm-white font-medium text-sm">
-                    {hasNewResponse ? 'New response from your coach!' : 'Latest response from your coach'}
-                  </h3>
+                  <h3 className="text-warm-white font-medium text-sm">New response from your coach!</h3>
                   <p className="text-earth-500 text-xs">
                     {latestResponse.coachResponse.timestamp
                       ? new Date(latestResponse.coachResponse.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -375,12 +384,73 @@ export default function ClientDashboard() {
                 />
               ) : (
                 <button
-                  onClick={() => setShowReply(true)}
+                  onClick={(e) => { e.stopPropagation(); setShowReply(true); }}
                   className="mt-3 w-full py-2.5 bg-forest-700/40 hover:bg-forest-700/60 text-earth-400 hover:text-warm-white rounded-xl text-sm transition-all border border-forest-600/30 hover:border-forest-600/50 flex items-center justify-center gap-2"
                 >
                   <img src="/icons/reply2-flipped.png" alt="Reply" className="w-6 h-6" />
                   Reply to your coach
                 </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {latestResponse?.coachResponse && !hasNewResponse && (
+          /* SEEN response — collapsed minimal row, expandable */
+          <div className="animate-slide-up stagger-1 opacity-0 mb-6">
+            <div className="bg-forest-800 rounded-2xl border border-forest-700/30 overflow-hidden">
+              {/* Collapsed header row */}
+              <button
+                onClick={() => setShowSeenResponse(prev => !prev)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-forest-700/30 transition-colors"
+              >
+                <img src="/icons/coach-response.png" alt="Coach" className="w-8 h-8 opacity-40" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-earth-500 text-sm">Latest coach response</span>
+                  <span className="text-earth-700 text-xs mx-1.5">·</span>
+                  <span className="text-earth-700 text-xs">
+                    {latestResponse.coachResponse.timestamp
+                      ? new Date(latestResponse.coachResponse.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      : new Date(latestResponse.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }
+                  </span>
+                </div>
+                <span className={`text-earth-600 text-xs transition-transform duration-200 ${showSeenResponse ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+
+              {/* Expanded content */}
+              {showSeenResponse && (
+                <div className="px-5 pb-5 pt-3 border-t border-forest-700/30">
+                  <div className="bg-forest-700/40 rounded-xl p-4 border border-forest-600/20">
+                    {latestResponse.coachResponse.text && (
+                      <p className="text-earth-300 text-sm leading-relaxed">"{latestResponse.coachResponse.text}"</p>
+                    )}
+                    {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'video' && (
+                      <VideoPlayer
+                        src={mediaUrl(latestResponse.coachResponse.mediaPath) + "#t=0.001"}
+                        className="mt-2"
+                      />
+                    )}
+                    {latestResponse.coachResponse.mediaPath && latestResponse.coachResponse.type === 'audio' && (
+                      <AudioPlayer src={mediaUrl(latestResponse.coachResponse.mediaPath)} className="mt-2" />
+                    )}
+                  </div>
+                  {showReply ? (
+                    <DashboardReplyForm
+                      checkinId={latestResponse.id}
+                      onSubmitted={() => { setShowReply(false); loadData(); }}
+                      onCancel={() => setShowReply(false)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setShowReply(true)}
+                      className="mt-3 w-full py-2.5 bg-forest-700/40 hover:bg-forest-700/60 text-earth-400 hover:text-warm-white rounded-xl text-sm transition-all border border-forest-600/30 hover:border-forest-600/50 flex items-center justify-center gap-2"
+                    >
+                      <img src="/icons/reply2-flipped.png" alt="Reply" className="w-6 h-6" />
+                      Reply to your coach
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>

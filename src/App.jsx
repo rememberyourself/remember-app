@@ -354,6 +354,8 @@ function AppRoutes() {
   );
 }
 
+console.log('[Remember] v15 loaded');
+
 export default function App() {
   return (
     <AuthProvider>

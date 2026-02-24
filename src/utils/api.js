@@ -464,11 +464,18 @@ export async function getUnreadResponseCount(clientId) {
 export async function markResponsesSeen(clientId) {
   // Update server-side last_seen (survives cache clears)
   const now = new Date().toISOString();
-  await supabase.from('users').update({ last_seen: now }).eq('id', clientId).catch(() => {});
+  const { error } = await supabase.from('users').update({ last_seen: now }).eq('id', clientId);
+  if (error) {
+    console.error('[markResponsesSeen] CRITICAL: DB write failed:', error.message, error);
+    // Clear badge anyway even if DB write failed
+    if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
+    return false;
+  }
   // Clear badge
   if ('clearAppBadge' in navigator) {
     navigator.clearAppBadge().catch(() => {});
   }
+  return true;
 }
 
 // Get count of check-ins without coach response (for coach badge)
