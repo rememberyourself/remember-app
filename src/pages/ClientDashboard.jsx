@@ -211,14 +211,30 @@ export default function ClientDashboard() {
   const [latestResponse, setLatestResponse] = useState(null);
   const [hasNewResponse, setHasNewResponse] = useState(false);
   const [showReply, setShowReply] = useState(false);
+  // Track which response timestamp we've already marked as seen locally.
+  // Prevents the red dot from reappearing due to a race condition where
+  // loadData() re-runs before the Supabase last_seen update has committed.
+  const seenResponseTimestampRef = useRef(null);
+
+  // Mark a response as seen: update DB + local tracking ref
+  const handleMarkSeen = useCallback(() => {
+    if (hasNewResponse) {
+      const responseTimestamp = latestResponse?.coachResponse?.timestamp;
+      seenResponseTimestampRef.current = responseTimestamp;
+      markResponsesSeen(user.id);
+      setHasNewResponse(false);
+    }
+  }, [hasNewResponse, latestResponse, user.id]);
 
   const loadData = () => {
     getProfile(user.id).then(p => setCustomPractices(p.customPractices || [])).catch(() => {});
     getLatestCoachResponse(user.id).then(data => {
       setLatestResponse(data);
-      const isNew = data?.hasNewResponse || false;
-      setHasNewResponse(isNew);
-      // Don't auto-clear — let user dismiss by tapping the response
+      const responseTimestamp = data?.coachResponse?.timestamp;
+      // If we already marked this specific response as seen locally (via seenResponseTimestampRef),
+      // keep hasNewResponse=false even if DB hasn't committed yet (race condition fix).
+      const isNew = data?.hasNewResponse && responseTimestamp !== seenResponseTimestampRef.current;
+      setHasNewResponse(!!isNew);
     }).catch(() => {});
     getCheckins(user.id).then(data => {
       setCheckins(data);
@@ -305,12 +321,7 @@ export default function ClientDashboard() {
 
         {/* Latest Coach Response — prominent card */}
         {latestResponse?.coachResponse && (
-          <div className="animate-slide-up stagger-1 opacity-0 mb-6" onClick={() => {
-            if (hasNewResponse) {
-              markResponsesSeen(user.id);
-              setHasNewResponse(false);
-            }
-          }}>
+          <div className="animate-slide-up stagger-1 opacity-0 mb-6" onClick={handleMarkSeen}>
             <div className="bg-forest-800 rounded-2xl p-5 border-2 border-gold-500/30 relative overflow-hidden">
               {/* Gold accent bar */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold-500/60 via-gold-500 to-gold-500/60" />
@@ -345,11 +356,8 @@ export default function ClientDashboard() {
                     src={mediaUrl(latestResponse.coachResponse.mediaPath) + "#t=0.001"} 
                     className="mt-2"
                     onEnded={() => {
-                      if (hasNewResponse) {
-                        console.log('[ClientDashboard] Video ended, marking responses as seen');
-                        markResponsesSeen(user.id);
-                        setHasNewResponse(false);
-                      }
+                      console.log('[ClientDashboard] Video ended, marking responses as seen');
+                      handleMarkSeen();
                     }}
                   />
                 )}
@@ -455,11 +463,8 @@ export default function ClientDashboard() {
                     src={mediaUrl(lastCheckin.coachResponse.mediaPath) + "#t=0.001"} 
                     className="mt-2"
                     onEnded={() => {
-                      if (hasNewResponse) {
-                        console.log('[ClientDashboard] Last checkin video ended, marking responses as seen');
-                        markResponsesSeen(user.id);
-                        setHasNewResponse(false);
-                      }
+                      console.log('[ClientDashboard] Last checkin video ended, marking responses as seen');
+                      handleMarkSeen();
                     }}
                   />
                 )}

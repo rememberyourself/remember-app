@@ -48,21 +48,30 @@ self.addEventListener('push', (event) => {
         tag,
         data: { url: data.url || '/dashboard' },
       }),
-      // Notify the main page to update badge (iOS doesn't support setAppBadge in SW)
+      // Notify open app windows to refresh their badge/data
       (async () => {
         try {
           const allClients = await clients.matchAll({ type: 'window' });
           for (const client of allClients) {
-            client.postMessage({ type: 'PUSH_RECEIVED', title: data.title });
+            client.postMessage({ type: 'PUSH_RECEIVED', title: data.title, badge: data.badge });
           }
-          // Set app badge from push payload (works on Chrome/Android, not iOS)
+          // Set app badge from push payload.
+          // ✅ Works on: Chrome (desktop/Android), Samsung Internet, Edge
+          // ❌ Known Limitation — iOS/Safari: setAppBadge() is NOT supported in the
+          //    Service Worker context. iOS automatically uses the notification count
+          //    as the homescreen badge. Since we use unique tags (with Date.now()),
+          //    notifications don't collapse and iOS counts them correctly.
+          //    The badge resets when the user opens the app (via clearAppBadge() in the app).
           if ('setAppBadge' in navigator && data.badge !== undefined) {
             await navigator.setAppBadge(data.badge);
           } else if ('setAppBadge' in navigator) {
+            // Fallback: count currently active notifications
             const notifications = await self.registration.getNotifications();
             await navigator.setAppBadge(notifications.length + 1);
           }
-        } catch {}
+        } catch (e) {
+          // Badge API may not be available — non-critical, ignore silently
+        }
       })(),
     ])
   );
